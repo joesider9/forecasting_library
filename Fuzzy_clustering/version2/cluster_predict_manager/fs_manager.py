@@ -12,6 +12,7 @@ class FeatSelManager(object):
         self.inner_jobs = cluster.static_data['inner_jobs_feat_sel']
         self.data_dir = cluster.data_dir
         self.cluster_dir = cluster.cluster_dir
+        self.pca = None
         if self.method == 'boruta':
             self.model_dir = os.path.join(cluster.cluster_dir, 'FS/boruta')
         else:

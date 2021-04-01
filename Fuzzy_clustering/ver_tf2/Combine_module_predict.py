@@ -41,6 +41,27 @@ class combine_model_predict(object):
         self.n_jobs = 2 * static_data['njobs']
 
         self.data_dir = os.path.join(self.cluster_dir, 'data')
+    def averaged(self,X):
+        pred_combine = dict()
+        X_pred = np.array([])
+        self.best_methods = X.keys()
+        for method in sorted(self.best_methods):
+            if X_pred.shape[0]==0:
+                X_pred = X[method]
+            else:
+                X_pred = np.hstack((X_pred, X[method]))
+        if X_pred.shape[0]>0:
+            pred = np.mean(X_pred, axis=1).reshape(-1, 1)
+
+            if len(pred.shape)==1:
+                pred = pred.reshape(-1,1)
+
+            pred[np.where(pred<0)] = 0
+            pred_combine['average'] = pred
+        else:
+            pred_combine['average'] = np.array([])
+
+        return pred_combine
 
     def predict(self, X):
         pred_combine = dict()

@@ -369,6 +369,9 @@ class cluster_predict(object):
         if comb_model.istrained == True and len(predictions.keys())>1:
             pred_combine = comb_model.predict(predictions)
             predictions.update(pred_combine)
+        elif len(predictions.keys())>1:
+            pred_combine = comb_model.averaged(predictions)
+            predictions.update(pred_combine)
 
         return predictions
 

@@ -13,8 +13,8 @@ from sklearn.preprocessing import MaxAbsScaler
 from sklearn.preprocessing import MinMaxScaler
 
 from Fuzzy_clustering.version2.cluster_predict_manager.cluster_predict_manager import ClusterPredict
-from Fuzzy_clustering.version2.fuzzy_clustering_manager.clusterer_optimize_deep import clusterer
-from Fuzzy_clustering.version2.model_manager.data_manage_clusters import cluster_object
+from Fuzzy_clustering.version2.fuzzy_clustering_manager.clusterer_optimize_deep import Clusterer
+from Fuzzy_clustering.version2.model_manager.data_manage_clusters import ClusterObject
 
 
 @contextmanager
@@ -27,7 +27,7 @@ def elapsed_timer():
 
 
 def create_cluster(static_data, cluster_name, activations, X1, y1, X_cnn, X_lstm, split_test):
-    cluster = cluster_object(static_data, cluster_name)
+    cluster = ClusterObject(static_data, cluster_name)
     if cluster.istrained == False:
         cluster.save_cluster_data(X1, y1, X_cnn, X_lstm, activations=activations, split_test=split_test)
 
@@ -43,6 +43,8 @@ class ModelTrainManager(object):
             self.load()
         except:
             pass
+        if hasattr(self, 'is_trained'):
+            self.istrained = self.is_trained
 
     def init(self, static_data, data_variables):
         self.data_variables = data_variables
@@ -55,43 +57,43 @@ class ModelTrainManager(object):
         self.var_lin = static_data['clustering']['var_lin']
         self.var_nonreg = static_data['clustering']['var_nonreg']
 
-        X, y, X_cnn, X_lstm = self.load_data()
+        x, y, x_cnn, x_lstm = self.load_data()
         if y.isna().any().values[0]:
-            X = X.drop(y.index[np.where(y.isna())[0]])
-            if len(X_cnn.shape) > 1:
-                X_cnn = np.delete(X_cnn, np.where(y.isna())[0], axis=0)
-            if len(X_lstm.shape) > 1:
-                X_lstm = np.delete(X_lstm, np.where(y.isna())[0], axis=0)
+            x = x.drop(y.index[np.where(y.isna())[0]])
+            if len(x_cnn.shape) > 1:
+                x_cnn = np.delete(x_cnn, np.where(y.isna())[0], axis=0)
+            if len(x_lstm.shape) > 1:
+                x_lstm = np.delete(x_lstm, np.where(y.isna())[0], axis=0)
             y = y.drop(y.index[np.where(y.isna())[0]])
         if self.static_data['type'] == 'pv' and self.static_data['NWP_model'] == 'skiron':
-            index = np.where(X['flux'] > 1e-8)[0]
-            X = X.iloc[index]
+            index = np.where(x['flux'] > 1e-8)[0]
+            x = x.iloc[index]
             y = y.iloc[index]
-            X_cnn = X_cnn[index]
-        sc = MinMaxScaler().fit(X.values)
+            # x_cnn = x_cnn[index]
+        sc = MinMaxScaler().fit(x.values)
         joblib.dump(sc, os.path.join(self.static_data['path_data'], 'X_scaler.pickle'))
         scale_y = MaxAbsScaler().fit(y.values)
         joblib.dump(scale_y, os.path.join(self.static_data['path_data'], 'Y_scaler.pickle'))
 
     def load_data(self):
         data_path = self.static_data['path_data']
-        X = pd.read_csv(os.path.join(data_path, 'dataset_X.csv'), index_col=0, header=0, parse_dates=True,
+        x = pd.read_csv(os.path.join(data_path, 'dataset_X.csv'), index_col=0, header=0, parse_dates=True,
                         dayfirst=True)
         y = pd.read_csv(os.path.join(data_path, 'dataset_y.csv'), index_col=0, header=0, parse_dates=True,
                         dayfirst=True)
 
         if os.path.exists(os.path.join(data_path, 'dataset_cnn.pickle')):
-            X_cnn = joblib.load(os.path.join(data_path, 'dataset_cnn.pickle'))
-            X_cnn = X_cnn.transpose([0, 2, 3, 1])
+            x_cnn = joblib.load(os.path.join(data_path, 'dataset_cnn.pickle'))
+            x_cnn = x_cnn.transpose([0, 2, 3, 1])
         else:
-            X_cnn = np.array([])
+            x_cnn = np.array([])
 
         if os.path.exists(os.path.join(data_path, 'dataset_lstm.pickle')):
-            X_lstm = joblib.load(os.path.join(data_path, 'dataset_lstm.pickle'))
+            x_lstm = joblib.load(os.path.join(data_path, 'dataset_lstm.pickle'))
         else:
-            X_lstm = np.array([])
+            x_lstm = np.array([])
 
-        return X, y, X_cnn, X_lstm
+        return x, y, x_cnn, x_lstm
 
     def split_test_data(self, X1, activations=None):
         if activations is None:
@@ -163,18 +165,19 @@ class ModelTrainManager(object):
 
         y1 = pd.DataFrame(scale_y.transform(y.values), columns=y.columns, index=y.index)
 
-        self.clusterer = clusterer(self.static_data)
-
-        activations = self.clusterer.compute_activations(X1)
+        
 
         if self.static_data['clustering']['is_Fuzzy']:
+            self.clusterer = Clusterer(self.static_data)
+
+            activations = self.clusterer.compute_activations(X1)
             self.split_test_data(X1, activations=activations)
         else:
             self.split_test_data(X1)
 
         self.clusters = {}
         if self.static_data['is_Global']:
-            cluster = cluster_object(self.static_data, 'global')
+            cluster = ClusterObject(self.static_data, 'global')
             if cluster.istrained == False:
                 cluster.save_cluster_data(X1, y1, X_cnn, X_lstm, split_test=self.split_test)
             self.clusters['global'] = cluster
@@ -210,10 +213,11 @@ class ModelTrainManager(object):
         pred_cluster = dict()
         X_test = pd.DataFrame(sc.transform(X_test.values), columns=X_test.columns, index=X_test.index)
         y_test = pd.DataFrame(scale_y.transform(y_test.values), columns=y_test.columns, index=y_test.index)
-        if not hasattr(self, 'clusterer'):
-            self.clusterer = clusterer(self.static_data['path_fuzzy_models'])
-        act_test = self.clusterer.compute_activations(X_test)
-        act_test = self.check_if_all_nans(act_test)
+        if self.static_data['clustering']['is_Fuzzy']:
+            if not hasattr(self, 'clusterer'):
+                self.clusterer = Clusterer(self.static_data['path_fuzzy_models'])
+            act_test = self.clusterer.compute_activations(X_test)
+            act_test = self.check_if_all_nans(act_test)
         for clust in self.clusters.keys():
             predict_module = ClusterPredict(self.static_data, self.clusters[clust])
             if clust == 'global':

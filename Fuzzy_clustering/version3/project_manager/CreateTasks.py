@@ -1,6 +1,6 @@
-import numpy as np
-import pandas as pd
 import copy
+
+import numpy as np
 
 
 class TaskCreator():
@@ -15,7 +15,6 @@ class TaskCreator():
             tasks_comb_ols.append(task)
         return tasks_comb_ols
 
-
     def create_tasks_stage_for_combine(self, projects):
         # Train in parallel SKLEARN models
         tasks_comb_ols = []
@@ -26,20 +25,18 @@ class TaskCreator():
                     tasks_comb_ols.append(task)
         return tasks_comb_ols
 
-
     def create_tasks_stage_for_sklearn(self, projects, sklearn_methods):
         # Train in parallel SKLEARN models
         tasks_sk_ols = []
         for method in sklearn_methods:
             for project in projects:
                 for cluster_name, cluster in project.clusters.items():
-                    if cluster.istrained == False:
+                    if cluster.is_trained == False:
                         task = {'project': project.static_data['_id'], 'static_data': project.static_data,
                                 'cluster': cluster.cluster_name, 'method': method,
                                 'optimize_method': project.static_data['sklearn']['optimizer']}
                         tasks_sk_ols.append(task)
         return tasks_sk_ols
-
 
     def create_tasks_rbfcnn_stage2(self, result_1st_stage_rbf_pd, tasks_rbf_stage1):
         tasks = []
@@ -49,7 +46,7 @@ class TaskCreator():
                            and (result_1st_stage_rbf_pd['cluster'] == task_ind['cluster'].cluster_name).any())[0]
             if task_ind['params']['test'] == result_1st_stage_rbf_pd['test'].iloc[ind].values[0]:
                 tasks.append(task_ind)
-        gpu = np.tile(np.arange(self.static_data['ngpus']), int(2*len(tasks)/self.static_data['ngpus'])+1)
+        gpu = np.tile(np.arange(self.static_data['ngpus']), int(2 * len(tasks) / self.static_data['ngpus']) + 1)
         np.random.shuffle(gpu)
         i = 0
         task_rbfcnn_stage2 = []
@@ -78,7 +75,6 @@ class TaskCreator():
 
         return task_rbfcnn_stage2
 
-
     def create_tasks_rbfcnn_stage1(self, projects):
         # Train in parallel RBF-CNN
 
@@ -90,13 +86,13 @@ class TaskCreator():
         ntasks = 0
         for project in projects:
             for cluster_name, cluster in project.clusters.items():
-                ntasks+= 4
+                ntasks += 4
         gpu = np.tile(np.arange(self.static_data['ngpus']), int(ntasks / self.static_data['ngpus']) + 1)
         np.random.shuffle(gpu)
-        i=0
+        i = 0
         for project in projects:
             for cluster_name, cluster in project.clusters.items():
-                if cluster.istrained == False:
+                if cluster.is_trained == False:
                     if ('RBF_ALL_CNN' in cluster.methods):
                         lr = project.static_data['CNN']['learning_rate']
                         h_size = project.static_data['CNN']['h_size']
@@ -144,10 +140,6 @@ class TaskCreator():
 
         return task_rbfcnn_stage1
 
-
-
-
-
     def create_tasks_3d_stage2(self, result_1st_stage_3d_pd, tasks_3d_stage1):
         tasks = []
         for task_ind in tasks_3d_stage1:
@@ -157,11 +149,11 @@ class TaskCreator():
             if task_ind['params']['test'] == result_1st_stage_3d_pd['test'].iloc[ind].values[0]:
                 tasks.append(task_ind)
 
-        gpu = np.tile(np.arange(self.static_data['ngpus']), int(2*len(tasks) / self.static_data['ngpus']) + 1)
+        gpu = np.tile(np.arange(self.static_data['ngpus']), int(2 * len(tasks) / self.static_data['ngpus']) + 1)
         np.random.shuffle(gpu)
         task_count = 0
         task_3d_stage2 = []
-        i=0
+        i = 0
         for task_ind in tasks:
             task1 = copy.deepcopy(task_ind)
             if task1['method'] == 'LSTM':
@@ -206,7 +198,6 @@ class TaskCreator():
 
         return task_3d_stage2
 
-
     def create_tasks_stage_rbf_lr(self, result_1st_stage_rbf_pd, task_rbf_stage1):
         tasks = []
         for task_ind in task_rbf_stage1:
@@ -216,7 +207,7 @@ class TaskCreator():
             if task_ind['params']['test'] == result_1st_stage_rbf_pd['test'].iloc[ind].values[0]:
                 tasks.append(task_ind)
 
-        gpu = np.tile(np.arange(self.static_data['ngpus']), int(2*len(tasks) / self.static_data['ngpus']) + 1)
+        gpu = np.tile(np.arange(self.static_data['ngpus']), int(2 * len(tasks) / self.static_data['ngpus']) + 1)
         np.random.shuffle(gpu)
 
         i = 0
@@ -244,7 +235,6 @@ class TaskCreator():
             #     gpu = 0
         return task_rbf_stage_fn
 
-
     def create_tasks_stage_rbf_ft(self, result_1st_stage_rbf_pd, task_rbf_stage1):
         tasks = []
         for task_ind in task_rbf_stage1:
@@ -255,7 +245,7 @@ class TaskCreator():
                 tasks.append(task_ind)
         i = 0
         task_rbf_stage1 = []
-        gpu = np.tile(np.arange(self.static_data['ngpus']), int(2*len(tasks) / self.static_data['ngpus']) + 1)
+        gpu = np.tile(np.arange(self.static_data['ngpus']), int(2 * len(tasks) / self.static_data['ngpus']) + 1)
         np.random.shuffle(gpu)
 
         for task_ind in tasks:
@@ -281,7 +271,6 @@ class TaskCreator():
 
         return task_rbf_stage1
 
-
     def create_tasks_stage_for_rbfs(self, projects):
 
         gpu = 0
@@ -295,7 +284,7 @@ class TaskCreator():
         i = 0
         for project in projects:
             for cluster_name, cluster in project.clusters.items():
-                if cluster.istrained == False:
+                if cluster.is_trained == False:
                     if ('RBF_ALL_CNN' in cluster.methods) or ('RBF_ALL' in cluster.methods):
                         lr = project.static_data['RBF']['learning_rate']
                         for i, num_centr in enumerate([8, 12, 16, 20, 24, 28, 32, 36, 40, 48, 52]):
@@ -309,7 +298,6 @@ class TaskCreator():
                             # if gpu == project.static_data['ngpus']:
                             #     gpu = 0
         return task_rbf_stage1
-
 
     def create_tasks_3d_stage1(self, projects):
         # Train in parallel deep_models and Feature Selection
@@ -330,7 +318,7 @@ class TaskCreator():
 
         for project in projects:
             for cluster_name, cluster in project.clusters.items():
-                if cluster.istrained == False:
+                if cluster.is_trained == False:
                     if 'LSTM' in cluster.methods:
                         min_units = project.static_data['LSTM']['units']
                         lr = project.static_data['LSTM']['learning_rate']
@@ -346,7 +334,8 @@ class TaskCreator():
                         #     gpu = 0
                         task = {'method': 'LSTM', 'project': project.static_data['_id'], 'cluster': cluster.cluster_name,
                                 'static_data': project.static_data,
-                                'params': {'test': 2, 'trial': 3, 'units': [2 * min_units, 1024, min_units, 1024], 'lr': lr,
+                                'params': {'test': 2, 'trial': 3, 'units': [2 * min_units, 1024, min_units, 1024],
+                                           'lr': lr,
                                            'gpu': gpu[i]}}
 
                         task_3d_stage1.append(task)
@@ -356,14 +345,15 @@ class TaskCreator():
                         #     gpu = 0
         for project in projects:
             for cluster_name, cluster in project.clusters.items():
-                if cluster.istrained == False:
+                if cluster.is_trained == False:
                     if 'CNN' in cluster.methods:
                         lr = project.static_data['CNN']['learning_rate']
                         h_size = project.static_data['CNN']['h_size']
 
                         task = {'method': 'CNN', 'project': project.static_data['_id'], 'cluster': cluster.cluster_name,
                                 'static_data': project.static_data,
-                                'params': {'test': 1, 'trial': 0, 'pool_size': [2, 1], 'kernels': [2, 4], 'h_size': h_size,
+                                'params': {'test': 1, 'trial': 0, 'pool_size': [2, 1], 'kernels': [2, 4],
+                                           'h_size': h_size,
                                            'lr': lr, 'gpu': gpu[i]}}
 
                         task_3d_stage1.append(task)
@@ -373,7 +363,8 @@ class TaskCreator():
                         #     gpu = 0
                         task = {'method': 'CNN', 'project': project.static_data['_id'], 'cluster': cluster.cluster_name,
                                 'static_data': project.static_data,
-                                'params': {'test': 2, 'trial': 0, 'pool_size': [2, 1], 'kernels': [4, 2], 'h_size': h_size,
+                                'params': {'test': 2, 'trial': 0, 'pool_size': [2, 1], 'kernels': [4, 2],
+                                           'h_size': h_size,
                                            'lr': lr, 'gpu': gpu[i]}}
 
                         task_3d_stage1.append(task)
@@ -414,9 +405,8 @@ class TaskCreator():
         np.random.shuffle(gpu)
         task_count = 0
         task_3d_stage1 = []
-        i=0
+        i = 0
         for project in projects:
-
             lr = project.static_data['MLP']['learning_rate']
 
             task = {'method': 'MLP', 'project': project.static_data['_id'],
@@ -477,7 +467,7 @@ class TaskCreator():
 
         for project in projects:
             for cluster_name, cluster in project.clusters.items():
-                if cluster.istrained == False:
+                if cluster.is_trained == False:
                     lr = project.static_data['MLP']['learning_rate']
 
                     task = {'method': 'MLP', 'project': project.static_data['_id'],
@@ -520,7 +510,6 @@ class TaskCreator():
                     # if gpu == project.static_data['ngpus']:
                     #     gpu = 0
 
-
                     task = {'method': 'MLP', 'project': project.static_data['_id'],
                             'static_data': project.static_data,
                             'params': {'test': 5, 'trial': 2, 'units': [200, 100, 20], 'lr': lr, 'act_func': 'elu',
@@ -542,4 +531,3 @@ class TaskCreator():
                     #     gpu = 0
 
         return task_3d_stage1
-

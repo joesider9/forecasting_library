@@ -10,7 +10,7 @@ from Fuzzy_clustering.ver_tf2.Global_predict_regressor import global_predict
 from Fuzzy_clustering.ver_tf2.Combine_predict_model import Combine_overall_predict
 from Fuzzy_clustering.ver_tf2.util_database import write_database
 
-class ModelPredictManager(object):
+class ModelPredictManager_ver2(object):
 
     def __init__(self, path_model):
         self.istrained = False
@@ -206,9 +206,9 @@ class ModelPredictManager(object):
         if self.istrained:
             indices = X.index
             if self.static_data['type'] == 'pv' and self.static_data['NWP_model'] == 'skiron':
-                index = np.where(X['flux'] > 1e-8)[0]
-                X = X.iloc[index]
-                X_cnn = X_cnn[index]
+                index = X.index[np.where(X['flux'] > 1e-8)[0]]
+                X = X.loc[index]
+                X_cnn = X_cnn[np.where(X['flux'] > 1e-8)[0]]
             else:
                 index = indices
 

@@ -86,7 +86,7 @@ class FS(object):
 
         regressor = sklearn_model(self.static_data, self.log_dir, 1, 'rf', njobs, path_group=self.path_group)
         if regressor.istrained == False:
-            regressor.train(cvs)
+            regressor.train(cvs, FS=True)
 
         # Update classifier parameters
         estimator = regressor.model

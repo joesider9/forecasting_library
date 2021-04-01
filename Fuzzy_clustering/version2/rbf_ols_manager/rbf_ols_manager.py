@@ -5,7 +5,7 @@ import joblib
 from Fuzzy_clustering.version2.rbf_ols_manager.rbf_ols import rbf_ols_module
 
 
-class RBFOLS_Manager(object):
+class RbfOlsManager(object):
     def __init__(self, static_data, cluster):
         self.static_data = static_data
         self.istrained = False
@@ -39,28 +39,17 @@ class RBFOLS_Manager(object):
                                           , path_group=self.static_data['path_group'])
             if model_rbf_ols.istrained == False:
                 max_samples = 1500
-                for _ in range(4):
-                    try:
-                        print('Train RBFOLS ', self.cluster_name)
-                        self.models['RBF_OLS'] = model_rbf_ols.optimize_rbf(cvs, max_samples=max_samples)
-                        break
-                    except:
-                        print('Reduce training set')
-                        max_samples -= 500
-                        continue
+                print('Train RBFOLS ', self.cluster_name)
+                self.models['RBF_OLS'] = model_rbf_ols.optimize_rbf(cvs, max_samples=max_samples)
+
             else:
                 self.models['RBF_OLS'] = model_rbf_ols.to_dict()
             if model_rbf_ga.istrained == False:
                 max_samples = 1500
-                for _ in range(4):
-                    try:
-                        print('Train GA-RBF ', self.cluster_name)
-                        self.models['GA_RBF_OLS'] = model_rbf_ga.optimize_rbf(cvs, max_samples=max_samples)
-                        break
-                    except:
-                        print('Reduce training set')
-                        max_samples -= 500
-                        continue
+
+                print('Train GA-RBF ', self.cluster_name)
+                self.models['GA_RBF_OLS'] = model_rbf_ga.optimize_rbf(cvs, max_samples=max_samples)
+
             else:
                 self.models['GA_RBF_OLS'] = model_rbf_ga.to_dict()
             self.istrained = True

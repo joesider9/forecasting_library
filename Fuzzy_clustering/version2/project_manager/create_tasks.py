@@ -24,6 +24,8 @@ class TaskCreator():
                     task = {'project': project.static_data['_id'], 'static_data': project.static_data,
                             'cluster': cluster}
                     tasks_comb_ols.append(task)
+                else:
+                    tasks_comb_ols.append('ready')
         return tasks_comb_ols
 
     def create_tasks_stage_for_sklearn(self, projects, sklearn_methods):
@@ -37,6 +39,8 @@ class TaskCreator():
                                 'cluster': cluster, 'method': method,
                                 'optimize_method': project.static_data['sklearn']['optimizer']}
                         tasks_sk_ols.append(task)
+                    else:
+                        tasks_sk_ols.append('ready')
         return tasks_sk_ols
 
     def create_tasks_rbfcnn_stage2(self, result_1st_stage_rbf_pd, tasks_rbf_stage1):
@@ -470,8 +474,8 @@ class TaskCreator():
                 if cluster.istrained == False:
                     lr = project.static_data['MLP']['learning_rate']
 
-                    task = {'method': 'MLP', 'project': project.static_data['_id'],
-                            'static_data': project.static_data,
+                    task = {'method': 'MLP_3D', 'project': project.static_data['_id'],
+                            'static_data': project.static_data, 'cluster': cluster,
                             'params': {'test': 1, 'trial': 0, 'units': [100], 'lr': lr, 'act_func': 'elu',
                                        'gpu': gpu[i]}}
                     task_3d_stage1.append(task)
@@ -479,8 +483,8 @@ class TaskCreator():
                     i += 1
                     # if gpu == project.static_data['ngpus']:
                     #     gpu = 0
-                    task = {'method': 'MLP', 'project': project.static_data['_id'],
-                            'static_data': project.static_data,
+                    task = {'method': 'MLP_3D', 'project': project.static_data['_id'],
+                            'static_data': project.static_data, 'cluster': cluster,
                             'params': {'test': 2, 'trial': 0, 'units': [250], 'lr': lr, 'act_func': 'elu',
                                        'gpu': gpu[i]}}
 
@@ -490,8 +494,8 @@ class TaskCreator():
                     # if gpu == project.static_data['ngpus']:
                     #     gpu = 0
 
-                    task = {'method': 'MLP', 'project': project.static_data['_id'],
-                            'static_data': project.static_data,
+                    task = {'method': 'MLP_3D', 'project': project.static_data['_id'],
+                            'static_data': project.static_data, 'cluster': cluster,
                             'params': {'test': 3, 'trial': 1, 'units': [100, 20], 'lr': lr, 'act_func': 'elu',
                                        'gpu': gpu[i]}}
                     task_3d_stage1.append(task)
@@ -499,8 +503,8 @@ class TaskCreator():
                     i += 1
                     # if gpu == project.static_data['ngpus']:
                     #     gpu = 0
-                    task = {'method': 'MLP', 'project': project.static_data['_id'],
-                            'static_data': project.static_data,
+                    task = {'method': 'MLP_3D', 'project': project.static_data['_id'],
+                            'static_data': project.static_data, 'cluster': cluster,
                             'params': {'test': 4, 'trial': 1, 'units': [250, 80], 'lr': lr, 'act_func': 'elu',
                                        'gpu': gpu[i]}}
 
@@ -510,8 +514,8 @@ class TaskCreator():
                     # if gpu == project.static_data['ngpus']:
                     #     gpu = 0
 
-                    task = {'method': 'MLP', 'project': project.static_data['_id'],
-                            'static_data': project.static_data,
+                    task = {'method': 'MLP_3D', 'project': project.static_data['_id'],
+                            'static_data': project.static_data, 'cluster': cluster,
                             'params': {'test': 5, 'trial': 2, 'units': [200, 100, 20], 'lr': lr, 'act_func': 'elu',
                                        'gpu': gpu[i]}}
                     task_3d_stage1.append(task)
@@ -519,8 +523,8 @@ class TaskCreator():
                     i += 1
                     # if gpu == project.static_data['ngpus']:
                     #     gpu = 0
-                    task = {'method': 'MLP', 'project': project.static_data['_id'],
-                            'static_data': project.static_data,
+                    task = {'method': 'MLP_3D', 'project': project.static_data['_id'],
+                            'static_data': project.static_data, 'cluster': cluster,
                             'params': {'test': 6, 'trial': 2, 'units': [512, 256, 64], 'lr': lr, 'act_func': 'elu',
                                        'gpu': gpu[i]}}
 

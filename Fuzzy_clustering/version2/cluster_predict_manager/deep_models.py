@@ -5,7 +5,9 @@ import numpy as np
 
 from Fuzzy_clustering.version2.deep_models.cnn_predict import CNN_predict
 from Fuzzy_clustering.version2.deep_models.cnn_predict_3d import CNN_3d_predict
-from Fuzzy_clustering.version2.deep_models.lstm_predict_3d import LSTM_3d_predict
+from Fuzzy_clustering.version2.deep_models.lstm_predict_3d import Lstm3dPredict
+from Fuzzy_clustering.version2.deep_models.mlp_predict_3d import MLPPredict
+from Fuzzy_clustering.version2.deep_models.Cluster_object import cluster_object
 
 
 class model3d():
@@ -22,11 +24,15 @@ class model3d():
             self.model_dir = os.path.join(cluster.cluster_dir, 'RBFNN')
         elif self.method == 'rbf-cnn':
             self.model_dir = os.path.join(cluster.cluster_dir, 'RBF_CNN')
+        elif self.method == 'mlp_3d':
+            self.model_dir = os.path.join(cluster.cluster_dir, 'MLP_3D')
         try:
             self.load()
 
         except:
             pass
+        if hasattr(self, 'is_trained'):
+            self.istrained = self.is_trained
 
         self.static_data = static_data
         self.cluster_name = cluster.cluster_name
@@ -43,6 +49,8 @@ class model3d():
                 return self.predict_rbf(X)
             elif self.method == 'rbf-cnn':
                 return self.predict_rbf_cnn(X, rbf_models)
+            elif self.method == 'mlp_3d':
+                return self.predict_mlp(X)
         else:
             raise ImportError('Model %s is not trained for cluster %s of project', self.method,
                               self.cluster.cluster_name, self.static_data['_id'])
@@ -65,7 +73,18 @@ class model3d():
         return pred
 
     def predict_lstm(self, X):
-        model_predict = LSTM_3d_predict(self.model, self.scale_lstm, self.trial, self.probabilistic)
+        model_predict = Lstm3dPredict(self.model, self.scale_lstm, self.trial, self.probabilistic)
+        if self.istrained:
+            pred = model_predict.predict(X)
+            pred[np.where(pred < 0)] = 0
+            pred[np.where(pred > 1)] = 1
+        else:
+            raise ImportError('Model %s is not trained for cluster %s of project', self.method,
+                              self.cluster.cluster_name, self.static_data['_id'])
+        return pred
+
+    def predict_mlp(self, X):
+        model_predict = MLPPredict(self.static_data, self.model, self.trial, self.probabilistic)
         if self.istrained:
             pred = model_predict.predict(X)
             pred[np.where(pred < 0)] = 0

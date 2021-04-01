@@ -34,7 +34,7 @@ class ProjectLinker():
                     self.y[project['_id']] = pd.read_csv(
                         os.path.join(project['static_data']['path_data'], 'dataset_y.csv'), index_col=0,
                         header=0, parse_dates=True, dayfirst=True)
-                    self.var_imp = [v for v in project['static_data']['clustering']['var_imp'].keys()]
+                    self.var_imp = project['static_data']['clustering']['var_lin']
                     self.coord.append([project['_id']] + project['static_data']['location'])
                     self.country = project['static_data']['projects_group']
         if len(self.project_col) < 2:

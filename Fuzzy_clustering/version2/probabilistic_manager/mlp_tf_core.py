@@ -82,12 +82,13 @@ class MLP():
                 losses = []
                 for i, q in enumerate(quantiles):
                     # Get output layers
-                    output = tf.layers.dense(full_out_dropout, 1,
+                    output = tf.keras.layers.Dense(units=1,
                                              name="{}_q{}".format(i, int(q * 100)))
+                    out = output(full_out_dropout)
                     outputs.append(output)
 
                     # Create losses
-                    error = self.huber(y_pred_, output)
+                    error = self.huber(y_pred_, out)
                     loss = tf.reduce_mean(tf.maximum(q * error, (q - 1) * error),
                                           axis=-1)
 

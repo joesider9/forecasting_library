@@ -1,7 +1,7 @@
-import joblib
 import os
 import pickle
 
+import joblib
 import numpy as np
 import pandas as pd
 from sklearn.linear_model import LinearRegression
@@ -10,7 +10,7 @@ from sklearn.model_selection import train_test_split
 from Fuzzy_clustering.version2.common_utils.utils_for_forecast import split_continuous
 
 
-class cluster_object():
+class ClusterObject:
     def __init__(self, static_data, clust):
         self.istrained = False
         self.cluster_name = clust
@@ -88,21 +88,21 @@ class cluster_object():
 
         return cvs, cvs_cnn, cvs_lstm, X, y, act, X_cnn, X_lstm, X_test, y_test, act_test, X_cnn_test, X_lstm_test
 
-    def split_dataset(self, X, y, act):
-        X = X.values
+    def split_dataset(self, x, y, act):
+        x = x.values
         y = y.values
         act = act.values
         if len(y.shape) > 1:
             y = y.ravel()
         if len(act.shape) > 1:
             act = act.ravel()
-        self.N_tot, self.D = X.shape
+        self.N_tot, self.D = x.shape
 
         # TODO in version 4 integrate activation act to self.cvs
 
         cvs = []
         for _ in range(3):
-            X_train, X_test, y_train, y_test = split_continuous(X, y, test_size=0.15,
+            X_train, X_test, y_train, y_test = split_continuous(x, y, test_size=0.15,
                                                                 random_state=np.random.randint(100))
             X_train1, X_val, y_train1, y_val = train_test_split(X_train, y_train, test_size=0.15)
             cvs.append([X_train1, y_train1, X_val, y_val, X_test, y_test])
@@ -251,3 +251,41 @@ class cluster_object():
                 dict[k] = self.__dict__[k]
         pickle.dump(dict, f)
         f.close()
+class cluster_object():
+    def __init__(self, static_data, clust):
+        self.istrained = False
+        self.cluster_name = clust
+        self.cluster_dir = os.path.join(static_data['path_model'], 'Regressor_layer/' + clust)
+        self.static_data = static_data
+        self.model_type = static_data['type']
+        self.methods = [method for method in static_data['project_methods'].keys() if static_data['project_methods'][method]==True]
+        self.combine_methods = static_data['combine_methods']
+        self.rated = static_data['rated']
+        self.n_jobs = static_data['njobs']
+        self.var_lin = static_data['clustering']['var_lin']
+        self.data_dir = os.path.join(self.cluster_dir, 'data')
+        self.thres_split = static_data['clustering']['thres_split']
+        self.thres_act = static_data['clustering']['thres_act']
+
+        try:
+            self.load(self.cluster_dir)
+        except:
+            raise ImportError('Cannot find cluster ', clust)
+
+
+    def load(self, cluster_dir):
+        if os.path.exists(os.path.join(cluster_dir, 'model_' + self.cluster_name +'.pickle')):
+            try:
+                f = open(os.path.join(cluster_dir, 'model_' + self.cluster_name +'.pickle'), 'rb')
+                tmp_dict = pickle.load(f)
+                f.close()
+                tdict={}
+                for k in tmp_dict.keys():
+                    tdict[k] = tmp_dict[k]
+                self.__dict__.update(tdict)
+            except:
+                raise ImportError('Cannot open rule model %s', self.cluster_name)
+        else:
+            raise ImportError('Cannot find rule model %s', self.cluster_name)
+
+

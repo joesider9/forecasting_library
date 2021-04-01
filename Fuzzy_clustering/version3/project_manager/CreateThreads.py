@@ -1,3 +1,4 @@
+
 import os, glob, shutil, joblib, time, sys, psutil,copy
 from joblib import Parallel, delayed
 import multiprocessing as mp
@@ -20,10 +21,11 @@ RABBIT_MQ_PORT = int(os.getenv('RABBIT_MQ_PORT'))
 
 def FS_check(project_id, cluster):
     FS_model = FeatSelobject(cluster)
-    if FS_model.istrained==False:
+    if FS_model.istrained == False:
         return 'Untrained', cluster.cluster_name, project_id
     else:
         return 'Done', cluster.cluster_name, project_id
+
 
 def RBF_check(project_id, static_data, cluster):
     rbf_model = RBFOLS_manager_object(static_data, cluster)
@@ -31,6 +33,24 @@ def RBF_check(project_id, static_data, cluster):
         return 'Untrained', cluster.cluster_name, project_id
     else:
         return 'Done', cluster.cluster_name, project_id
+
+
+def ProbaThread(project_id, static_data, params):
+    method = 'MLP'
+    model = proba_model_manager(static_data, params)
+    if model.is_trained == False:
+        acc = model.fit()
+    else:
+        acc = model.acc
+
+    return acc, project_id, params['test'], method
+
+
+def GPU_thread_proba(tasks, njobs):
+    results = Parallel(n_jobs=njobs)(delayed(ProbaThread)(task['project'], task['static_data'],
+                                                          task['params']) for task in tasks)
+    return results
+
 
 def train_3d(client, tasks_3d):
     results = []
@@ -42,6 +62,7 @@ def train_3d(client, tasks_3d):
         results.append(client.call_deep_manager(static_data))
     return results
 
+
 def train_proba(client, tasks_3d):
     results = []
     for task in tasks_3d:
@@ -50,6 +71,7 @@ def train_proba(client, tasks_3d):
         static_data['method'] = task['method']
         results.append(client.call_proba_manager(static_data))
     return results
+
 
 def train_on_cpus(projects, static_data, methods, path_group):
     ncpus = int(static_data['njobs'])
@@ -69,7 +91,7 @@ def train_on_cpus(projects, static_data, methods, path_group):
     #     if mem<10:
     #         time.sleep(900)
 
-    gpu_status=joblib.load(os.path.join(path_group, 'gpu_status.pickle'))
+    gpu_status = joblib.load(os.path.join(path_group, 'gpu_status.pickle'))
 
     njobs = int(ncpus - gpu_status)
     cpu_status = njobs
@@ -91,7 +113,7 @@ def train_on_cpus(projects, static_data, methods, path_group):
                 raise RuntimeError('Feature selection fails cluster %s of project %s', res[1], res[2])
 
     ncpus = joblib.load(os.path.join(path_group, 'total_cpus.pickle'))
-    gpu_status=joblib.load(os.path.join(path_group, 'gpu_status.pickle'))
+    gpu_status = joblib.load(os.path.join(path_group, 'gpu_status.pickle'))
 
     njobs = int(ncpus - gpu_status)
     cpu_status = njobs
@@ -150,6 +172,7 @@ def train_on_cpus(projects, static_data, methods, path_group):
     cpu_status = 0
     joblib.dump(cpu_status, os.path.join(path_group, 'cpu_status.pickle'))
 
+
 def train_on_gpus(projects, static_data, methods, path_group):
     TasksCreator = TaskCreator(static_data)
     ngpus = static_data['ngpus']
@@ -168,7 +191,7 @@ def train_on_gpus(projects, static_data, methods, path_group):
             client_3d = RPCClient(queue_name='CNNmanager', host=RABBIT_MQ_HOST, port=RABBIT_MQ_PORT,
                                       threaded=False)
 
-        gpu_status = intra_op * ngpus*njobs
+        gpu_status = intra_op * ngpus * njobs
         joblib.dump(gpu_status, os.path.join(path_group, 'gpu_status.pickle'))
         while True:
             try:
@@ -178,7 +201,7 @@ def train_on_gpus(projects, static_data, methods, path_group):
                 time.sleep(30)
                 continue
 
-        while (cpu_status+gpu_status)>ncpus:
+        while (cpu_status + gpu_status) > ncpus:
             time.sleep(30)
             cpu_status = joblib.load(os.path.join(path_group, 'cpu_status.pickle'))
 
@@ -239,7 +262,7 @@ def train_on_gpus(projects, static_data, methods, path_group):
                 print(res)
                 print('succeed')
                 flag *= 1
-        if flag==0:
+        if flag == 0:
             time.sleep(300)
         else:
             break
@@ -328,7 +351,7 @@ def train_on_gpus(projects, static_data, methods, path_group):
                                       threaded=False)
         print('Train RBF-CNN 1st stage')
         njobs = static_data['CNN']['njobs']
-        gpu_status =  intra_op * ngpus * njobs
+        gpu_status = intra_op * ngpus * njobs
         joblib.dump(gpu_status, os.path.join(path_group, 'gpu_status.pickle'))
         cpu_status = joblib.load(os.path.join(path_group, 'cpu_status.pickle'))
         while (cpu_status + gpu_status) > ncpus:
@@ -345,7 +368,7 @@ def train_on_gpus(projects, static_data, methods, path_group):
                     result_rbf_cnn_pd.groupby(by=['method', 'project', 'cluster']).agg(
                         {'acc': 'idxmin'}).values.ravel()]
                 tasks_rbfcnn_stage2 = TasksCreator.create_tasks_rbfcnn_stage2(result_rbf_cnn_pd,
-                                                                                   tasks_rbfcnn_stage1)
+                                                                              tasks_rbfcnn_stage1)
                 tasks_rbfcnn_stage1 += tasks_rbfcnn_stage2
                 if len(tasks_rbfcnn_stage2) > 0:
                     result_rbf_cnn += train_3d(client_3d, tasks_rbfcnn_stage2)
@@ -371,7 +394,7 @@ def train_on_gpus(projects, static_data, methods, path_group):
                                       threaded=False)
         print('Training MLP_3D 1st stage starts')
         njobs = static_data['MLP']['njobs']
-        gpu_status =  intra_op * ngpus * njobs
+        gpu_status = intra_op * ngpus * njobs
         joblib.dump(gpu_status, os.path.join(path_group, 'gpu_status.pickle'))
         cpu_status = joblib.load(os.path.join(path_group, 'cpu_status.pickle'))
         while (cpu_status + gpu_status) > ncpus:

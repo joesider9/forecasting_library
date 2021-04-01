@@ -1,6 +1,6 @@
-import joblib
 import os
 
+import joblib
 import numpy as np
 import pandas as pd
 import tensorflow as tf
@@ -10,7 +10,7 @@ from tqdm import tqdm
 from Fuzzy_clustering.ver_tf2.clustering.algorithms import FCV
 
 
-class RBFNN():
+class RbfNN:
 
     def __init__(self, static_data, max_iterations=10000, learning_rate=5e-4, mean_var=0.05, std_var=0.05):
         self.static_data = static_data

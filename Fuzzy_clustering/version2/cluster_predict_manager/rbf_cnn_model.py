@@ -17,9 +17,9 @@ class RBF_CNN_model(object):
         self.model_rbf_ga = rbf_ols_module(self.static_data, self.model_dir_rbfols, self.static_data['rated'],
                                            self.static_data['sklearn']['njobs'],
                                            GA=True)
-        self.model_rbfnn = model3d(self.static_data, cluster, 'RBFNN')
+        self.model_rbf_nn = model3d(self.static_data, cluster, 'RBFNN')
 
-        if self.model_rbfnn.istrained == False:
+        if self.model_rbf_nn.istrained == False:
             raise ImportError('Cannot found RBFNN model for cluster %s of project %s', cluster.cluster_name,
                               static_data['_id'])
         if self.model_rbf_ols.istrained == False:
@@ -40,15 +40,15 @@ class RBF_CNN_model(object):
             pred1 = self.model_rbf_ols.predict(X)
         if self.model_rbf_ga.istrained == True:
             pred2 = self.model_rbf_ga.predict(X)
-        if self.model_rbfnn.istrained == True:
-            pred3 = self.model_rbfnn.predict(X)
+        if self.model_rbf_nn.istrained == True:
+            pred3 = self.model_rbf_nn.predict(X)
         pred1[np.where(pred1 < 0)] = 0
         pred2[np.where(pred2 < 0)] = 0
         pred3[np.where(pred3 < 0)] = 0
         pred1[np.where(pred1 > 1)] = 1
         pred2[np.where(pred2 > 1)] = 1
         pred3[np.where(pred3 > 1)] = 1
-        rbf_models = [self.model_rbf_ols.models, self.model_rbf_ga.models, self.model_rbfnn.model]
+        rbf_models = [self.model_rbf_ols.models, self.model_rbf_ga.models, self.model_rbf_nn.model]
 
         if self.cnn:
             if self.model_cnn.istrained == True:

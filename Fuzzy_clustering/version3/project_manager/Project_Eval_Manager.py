@@ -1,8 +1,13 @@
-import joblib, os
+import joblib
 import numpy as np
+import os
 import pandas as pd
-from Fuzzy_clustering.version3.project_manager.PredictModelManager.FullModelPredictManager import FullModelPredictManager
-from Fuzzy_clustering.version3.project_manager.PredictModelManager.FullClusterPredictManager import FullClusterPredictManager
+
+from Fuzzy_clustering.version3.project_manager.PredictModelManager.FullClusterPredictManager import \
+    FullClusterPredictManager
+from Fuzzy_clustering.version3.project_manager.PredictModelManager.FullModelPredictManager import \
+    FullModelPredictManager
+
 
 class ProjectsEvalManager():
     def __init__(self, project):
@@ -35,9 +40,10 @@ class ProjectsEvalManager():
 
     def evaluate_all(self):
         data_path = self.static_data['path_data']
-        if self.project.istrained:
+        if self.project.is_trained:
             clusters_predict_manager = FullClusterPredictManager(self.project.path_model, self.project.static_data)
-            pred_cluster, predictions_cluster, y_test_all, y_test, index, index_all = clusters_predict_manager.predict_clusters(test=True)
+            pred_cluster, predictions_cluster, y_test_all, y_test, index, index_all = clusters_predict_manager.predict_clusters(
+                test=True)
             model_predict_manager = FullModelPredictManager(self.project.path_model, self.project.static_data)
             predictions_final_temp = model_predict_manager.predict_model(pred_cluster, predictions_cluster, scale=True)
             predictions_final = dict()
@@ -53,5 +59,3 @@ class ProjectsEvalManager():
                     y_test.to_csv(os.path.join(data_path, 'target_test.csv'))
         else:
             raise ModuleNotFoundError('Model %s is not trained', self.static_data['_id'])
-
-

@@ -63,26 +63,28 @@ class Combine_overall_predict(object):
 
             combine_method = 'average'
             for method in self.methods:
-                pred = predictions[method].mean(axis=1).values.astype('float').reshape(-1, 1)
-                pred[np.where(pred < 0)] = 0
-                pred_combine['average_' + method] = pred
-
-            combine_method = 'bcp'
-            for method in self.combine_methods:
-                if 'bcp_'+method in self.models.keys():
-                    pred = self.bcp_predict(predictions[method].values.astype('float'), self.models['bcp_'+method])
+                if method in predictions.keys():
+                    pred = predictions[method].mean(axis=1).values.astype('float').reshape(-1, 1)
                     pred[np.where(pred < 0)] = 0
-                    pred_combine['bcp_' + method] = pred
+                    pred_combine['average_' + method] = pred
 
-            for method in self.combine_methods:
-                X_pred = predictions[method].values.astype('float')
-                X_pred[np.where(np.isnan(X_pred))] = 0
-                X_pred /= 20
-                mlp_model = sklearn_model_predict(self.model_dir + '/' + method, self.rated, 'mlp', self.n_jobs)
-                if mlp_model.istrained == True:
-                    pred = mlp_model.predict(X_pred)
-                    pred[np.where(pred < 0)] = 0
-                    pred_combine['mlp_' + method] = 20 * pred
+            if hasattr(self, 'models'):
+                combine_method = 'bcp'
+                for method in self.combine_methods:
+                    if 'bcp_'+method in self.models.keys():
+                        pred = self.bcp_predict(predictions[method].values.astype('float'), self.models['bcp_'+method])
+                        pred[np.where(pred < 0)] = 0
+                        pred_combine['bcp_' + method] = pred
+
+                for method in self.combine_methods:
+                    X_pred = predictions[method].values.astype('float')
+                    X_pred[np.where(np.isnan(X_pred))] = 0
+                    X_pred /= 20
+                    mlp_model = sklearn_model_predict(self.model_dir + '/' + method, self.rated, 'mlp', self.n_jobs)
+                    if mlp_model.istrained == True:
+                        pred = mlp_model.predict(X_pred)
+                        pred[np.where(pred < 0)] = 0
+                        pred_combine['mlp_' + method] = 20 * pred
             if lstm:
                 X = np.array([])
                 combine_method = 'lstm_full'

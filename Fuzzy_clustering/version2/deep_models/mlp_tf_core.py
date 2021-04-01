@@ -1,13 +1,13 @@
-import joblib
 import os
 import sys
 
+import joblib
 import numpy as np
 import tensorflow as tf
 from tqdm import tqdm
 
 
-class MLP():
+class MLP:
     def __init__(self, static_data, rated, X_train, y_train, X_val, y_val, X_test, y_test, trial=0, probabilistc=False):
         self.static_data = static_data
         self.probabilistic = probabilistc
@@ -44,7 +44,7 @@ class MLP():
         return tf.where(cond, squared_loss, linear_loss)
 
     def build_graph(self, x1, y_pred_, learning_rate, units, hold_prob, act_func):
-        if not self.rated is None:
+        if self.rated is not None:
             norm_val = tf.constant(1, tf.float32, name='rated')
         else:
             norm_val = y_pred_
@@ -170,13 +170,13 @@ class MLP():
         y_test = self.y_test
         y_train = self.y_train
 
-        self.N = H_train.shape[1]
+        self.N = H_train.shape[0]
         batch_size = np.min([100, int(self.N / 5)])
         tf.compat.v1.reset_default_graph()
         graph_mlp = tf.Graph()
         with graph_mlp.as_default():
             with tf.device(gpu_id):
-                x1 = tf.compat.v1.placeholder('float', shape=[None, H_train.shape[1], H_train.shape[2]],
+                x1 = tf.compat.v1.placeholder('float', shape=[None, H_train.shape[1]],
                                               name='input_data')
                 y_pred_ = tf.compat.v1.placeholder(tf.float32, shape=[None, y_train.shape[1]], name='target_mlp')
 
@@ -188,7 +188,9 @@ class MLP():
         obj_old = np.inf * np.ones(4)
         obj_max = np.inf * np.ones(4)
         obj_min = np.inf * np.ones(4)
-        batches = [np.random.choice(self.N, batch_size, replace=False) for _ in range(max_iterations + 1)]
+
+        iters = int(np.minimum(max_iterations, self.N / batch_size))
+        batches = [np.random.choice(self.N, batch_size, replace=False) for _ in range(iters + 1)]
 
         path_group = self.static_data['path_group']
         cpu_status = joblib.load(os.path.join(path_group, 'cpu_status.pickle'))
@@ -207,9 +209,10 @@ class MLP():
         best_glob_iterations = 0
         ext_iterations = max_iterations
         train_flag = True
-        patience = 10000
+        patience = 50000
         wait = 0
         loops = 0
+        itr = 0
 
         with tf.compat.v1.Session(graph=graph_mlp, config=config) as sess:
 
@@ -219,8 +222,10 @@ class MLP():
                     if i % 500 == 0:
 
                         sess.run([train_mlp],
-                                 feed_dict={x1: H_train[batches[i]], y_pred_: y_train[batches[i]]})
-
+                                 feed_dict={x1: H_train[batches[itr]], y_pred_: y_train[batches[itr]]})
+                        itr += 1
+                        if itr >= iters:
+                            itr=0
                         acc_new_v, mse_new_v, sse_new_v, rse_new_v, weights_mlp = sess.run([accuracy_mlp, cost_mlp,
                                                                                             sse_mlp, rse_mlp, weights],
                                                                                            feed_dict={x1: H_val,
@@ -253,7 +258,10 @@ class MLP():
                             break
                     else:
                         sess.run(train_mlp,
-                                 feed_dict={x1: H_train[batches[i]], y_pred_: y_train[batches[i]]})
+                                 feed_dict={x1: H_train[batches[itr]], y_pred_: y_train[batches[itr]]})
+                        itr += 1
+                        if itr >= iters:
+                            itr=0
                         wait += 1
                 best_glob_iterations = ext_iterations + best_iteration
                 if (max_iterations - best_iteration) <= 5000 and max_iterations > 2000:

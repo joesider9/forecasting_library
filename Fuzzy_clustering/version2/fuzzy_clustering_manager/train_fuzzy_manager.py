@@ -1,15 +1,15 @@
-import joblib
 import os
 import pickle
 
+import joblib
 import numpy as np
 import pandas as pd
 
-from Fuzzy_clustering.version2.fuzzy_clustering_manager.clusterer import clusterer
-from Fuzzy_clustering.version2.fuzzy_clustering_manager.clusterer_optimize_deep import cluster_optimize
+from Fuzzy_clustering.version2.fuzzy_clustering_manager.clusterer import Clusterer
+from Fuzzy_clustering.version2.fuzzy_clustering_manager.clusterer_optimize_deep import ClusterOptimize
 
 
-class FuzzyManager():
+class FuzzyManager:
     def __init__(self, static_data):
         self.istrained = False
         self.static_data = static_data
@@ -24,22 +24,21 @@ class FuzzyManager():
 
     def load_data(self):
         data_path = self.static_data['path_data']
-        X = pd.read_csv(os.path.join(data_path, 'dataset_X.csv'), index_col=0, header=0, parse_dates=True,
+        x = pd.read_csv(os.path.join(data_path, 'dataset_X.csv'), index_col=0, header=0, parse_dates=True,
                         dayfirst=True)
         y = pd.read_csv(os.path.join(data_path, 'dataset_y.csv'), index_col=0, header=0, parse_dates=True,
                         dayfirst=True)
-
-        return X, y
+        return x, y
 
     def train_fuzzy_clustering(self):
-        X, y = self.load_data()
+        x, y = self.load_data()
         if y.isna().any().values[0]:
-            X = X.drop(y.index[np.where(y.isna())[0]])
+            x = x.drop(y.index[np.where(y.isna())[0]])
             y = y.drop(y.index[np.where(y.isna())[0]])
 
-        N, D = X.shape
+        N, D = x.shape
         sc = joblib.load(os.path.join(self.static_data['path_data'], 'X_scaler.pickle'))
-        X1 = pd.DataFrame(sc.transform(X.values), columns=X.columns, index=X.index)
+        X1 = pd.DataFrame(sc.transform(x.values), columns=x.columns, index=x.index)
 
         scale_y = joblib.load(os.path.join(self.static_data['path_data'], 'Y_scaler.pickle'))
 
@@ -52,7 +51,7 @@ class FuzzyManager():
 
             X_train = X1.iloc[:n_split]
             y_train = y1.iloc[:n_split]
-            optimizer = cluster_optimize(self.static_data)
+            optimizer = ClusterOptimize(self.static_data)
             if optimizer.istrained == False:
                 if self.rated is None:
                     rated = None
@@ -66,14 +65,14 @@ class FuzzyManager():
 
             X_train = X1.iloc[:n_split]
             y_train = y1.iloc[:n_split]
-            optimizer = cluster_optimize(self.static_data)
-            if optimizer.istrained == False:
+            optimizer = ClusterOptimize(self.static_data)
+            if not optimizer.istrained:
                 if self.rated is None:
                     rated = None
                 else:
                     rated = self.rated
                 optimizer.run(X_train, y_train, X_test, y_test, rated)
-        self.clusterer = clusterer(self.static_data)
+        self.clusterer = Clusterer(self.static_data)
         self.istrained = True
         self.save()
         return 'Done'

@@ -61,10 +61,8 @@ class DataSampler(object):
                 # else:
                 strategy = "auto"
                 if np.unique(yy).shape[0] == 1:
-                    X2 = X
-                    X_3d2 = X_3d
-                    yy2 = y
-                    return X2, yy2
+                    return X, X_3d, y
+
                 if np.any(np.bincount(yy.ravel()) < 2):
                     for cl in np.where(np.bincount(yy.ravel()) < 2)[0]:
                         X = X[np.where(yy != cl)[0]]

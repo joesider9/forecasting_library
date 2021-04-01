@@ -491,7 +491,6 @@ class dataset_creator_xmachina():
         col += ['Ath24_' + str(i) for i in range(len(date_inp1))]
         col += ['Ath6_' + str(i) for i in range(1, len(date_inp1) + 1)]
         col += ['final_' + str(i) for i in range(len(date_inp2))]
-        col += ['customers_' + str(i) for i in range(len(date_inp1) + len(date_inp2))]
         col += ['temp_max_' + str(i) for i in range(len(date_inp1) + len(date_inp2))]
         col += ['hdd_h' + str(i) for i in range(len(date_inp1) + len(date_inp2))]
         col += ['sp_index' + str(i) for i in range(len(date_inp1) + len(date_inp2))]
@@ -518,7 +517,6 @@ class dataset_creator_xmachina():
                 self.data.loc[date_inp1, 'Athens_24'].values,
                 self.data.loc[date_inp1, 'Athens_6'].values,
                 self.data.loc[date_inp2, 'Final/Ζητούμενο'].values,
-                self.data.loc[date_inp1 + date_inp2, 'Αριθμός Πελατών από 1/1/2017'].values,
                 self.data.loc[date_inp1 + date_inp2, 'temp_max'].values,
                 self.data.loc[date_inp1 + date_inp2, 'hdd_h'].values,
                 self.data.loc[date_inp1 + date_inp2, 'sp_index'].values,
@@ -527,7 +525,6 @@ class dataset_creator_xmachina():
             col += ['Ath24_' + str(i) for i in range(len(date_inp1))]
             col += ['Ath6_' + str(i) for i in range(1, len(date_inp1) + 1)]
             col += ['final_' + str(i) for i in range(len(date_inp2))]
-            col += ['customers_' + str(i) for i in range(len(date_inp1) + len(date_inp2))]
             col += ['temp_max_' + str(i) for i in range(len(date_inp1) + len(date_inp2))]
             col += ['hdd_h' + str(i) for i in range(len(date_inp1) + len(date_inp2))]
             col += ['sp_index' + str(i) for i in range(len(date_inp1) + len(date_inp2))]
@@ -537,7 +534,6 @@ class dataset_creator_xmachina():
                                                                                            'rh', 'hdd_h',
                                                                                            'hdd_h2']].loc[date].values,
                                 temp,
-                                self.data.loc[date_inp1[0], 'Αριθμός Πελατών από 1/1/2017'],
                                 np.power(self.data['month'].loc[date] * temp / 12, 3),
                                 np.power(self.data['sp_index'].loc[date] * temp / 100, 3)))
             for d in date_inp1:
@@ -546,7 +542,6 @@ class dataset_creator_xmachina():
                     (self.data.loc[d, 'Athens_24'], self.data.loc[d, 'Athens_6'],
                      self.data[['temp_min', 'temp_mean', 'rh', 'hdd_h', 'hdd_h2']].loc[d].values,
                      temp,
-                     self.data.loc[d, 'Αριθμός Πελατών από 1/1/2017'],
                      np.power(self.data['month'].loc[date] * temp / 12, 3),
                      np.power(self.data['sp_index'].loc[date] * temp / 100, 3)))
                 var_3d = np.vstack((var_3d, v))
@@ -556,7 +551,6 @@ class dataset_creator_xmachina():
                     (self.data.loc[d, 'Final/Ζητούμενο'], self.data.loc[d, 'Athens_6'],
                      self.data[['temp_min', 'temp_mean', 'rh', 'hdd_h', 'hdd_h2']].loc[d].values,
                      temp,
-                     self.data.loc[d, 'Αριθμός Πελατών από 1/1/2017'],
                      np.power(self.data['month'].loc[date] * temp / 12, 3),
                      np.power(self.data['sp_index'].loc[date] * temp / 100, 3)))
                 var_3d = np.vstack((var_3d, v))
@@ -615,7 +609,6 @@ class dataset_creator_xmachina():
         col += ['Ath24_' + str(i) for i in range(len(date_inp1))]
         col += ['Ath6_' + str(i) for i in range(1, len(date_inp1) + 1)]
         col += ['final_' + str(i) for i in range(len(date_inp2))]
-        col += ['customers_' + str(i) for i in range(len(date_inp1) + len(date_inp2))]
         col += ['temp_max_' + str(i) for i in range(len(date_inp1) + len(date_inp2))]
         col += ['hdd_h' + str(i) for i in range(len(date_inp1) + len(date_inp2))]
         col += ['sp_index' + str(i) for i in range(len(date_inp1) + len(date_inp2))]
@@ -626,10 +619,10 @@ class dataset_creator_xmachina():
         for date in self.data.index[start_index:]:
             date_inp1 = [date - pd.DateOffset(days=int(l)) for l in lags1]
             date_inp2 = [date - pd.DateOffset(days=int(l)) for l in lags2]
-            temp = self.data[['pred_temp_max']].loc[date].values
+            temp = self.data[['temp_max']].loc[date].values
             var_imp1 = np.hstack((
-                self.data[['pred_temp_min', 'pred_temp_mean',
-                           'pred_rh', 'pred_precip', 'pred_hdd_h', 'pred_hdd_h2']].loc[date].values,
+                self.data[['temp_min', 'temp_mean',
+                           'rh', 'precip', 'hdd_h', 'hdd_h2']].loc[date].values,
                 self.data[['month', 'sp_index', 'dayweek']].loc[date].values,
                 temp,
                 np.power(self.data['month'].loc[date] * temp / 12, 3),
@@ -639,10 +632,10 @@ class dataset_creator_xmachina():
                    'temp_max', 'Temp_month', 'Temp_sp_days']
 
             date_curr = date - pd.DateOffset(days=int(1))
-            temp = self.data[['pred_temp_max']].loc[date_curr].values
+            temp = self.data[['temp_max']].loc[date_curr].values
             var_imp = np.hstack((self.data.loc[date_curr, 'Athens_6'],
-                                 self.data[['pred_temp_min', 'pred_temp_mean',
-                                            'pred_rh', 'pred_precip', 'pred_hdd_h', 'pred_hdd_h2']].loc[
+                                 self.data[['temp_min', 'temp_mean',
+                                            'rh', 'precip', 'hdd_h', 'hdd_h2']].loc[
                                      date_curr].values,
                                  self.data[['month', 'sp_index', 'dayweek']].loc[date_curr].values,
                                  temp,
@@ -657,7 +650,6 @@ class dataset_creator_xmachina():
                 self.data.loc[date_inp1, 'Athens_24'].values,
                 self.data.loc[date_inp1, 'Athens_6'].values,
                 self.data.loc[date_inp2, 'Final/Ζητούμενο'].values,
-                self.data.loc[date_inp1 + date_inp2, 'Αριθμός Πελατών από 1/1/2017'].values,
                 self.data.loc[date_inp1 + date_inp2, 'temp_max'].values,
                 self.data.loc[date_inp1 + date_inp2, 'hdd_h'].values,
                 self.data.loc[date_inp1 + date_inp2, 'sp_index'].values,
@@ -666,28 +658,25 @@ class dataset_creator_xmachina():
             col += ['Ath24_' + str(i) for i in range(len(date_inp1))]
             col += ['Ath6_' + str(i) for i in range(1, len(date_inp1) + 1)]
             col += ['final_' + str(i) for i in range(len(date_inp2))]
-            col += ['customers_' + str(i) for i in range(len(date_inp1) + len(date_inp2))]
             col += ['temp_max_' + str(i) for i in range(len(date_inp1) + len(date_inp2))]
             col += ['hdd_h' + str(i) for i in range(len(date_inp1) + len(date_inp2))]
             col += ['sp_index' + str(i) for i in range(len(date_inp1) + len(date_inp2))]
 
             temp = self.data[['temp_max']].loc[date].values
-            var_3d = np.hstack((np.array([0]), np.array([0]), self.data[['pred_temp_min', 'pred_temp_mean',
-                                                                         'pred_rh', 'pred_hdd_h', 'pred_hdd_h2']].loc[
+            var_3d = np.hstack((np.array([0]), np.array([0]), self.data[['temp_min', 'temp_mean',
+                                                                         'rh', 'hdd_h', 'hdd_h2']].loc[
                 date].values,
                                 temp,
-                                self.data.loc[date_inp1[0], 'Αριθμός Πελατών από 1/1/2017'],
                                 np.power(self.data['month'].loc[date] * temp / 12, 3),
                                 np.power(self.data['sp_index'].loc[date] * temp / 100, 3)))
 
             date_curr = date - pd.DateOffset(days=int(1))
             temp = self.data[['temp_max']].loc[date_curr].values
             v = np.hstack(
-                (np.array([0]), self.data.loc[date_curr, 'Athens_6'], self.data[['pred_temp_min', 'pred_temp_mean',
-                                                                                 'pred_rh', 'pred_hdd_h',
-                                                                                 'pred_hdd_h2']].loc[date_curr].values,
+                (np.array([0]), self.data.loc[date_curr, 'Athens_6'], self.data[['temp_min', 'temp_mean',
+                                                                                 'rh', 'hdd_h',
+                                                                                 'hdd_h2']].loc[date_curr].values,
                  temp,
-                 self.data.loc[date_inp1[0], 'Αριθμός Πελατών από 1/1/2017'],
                  np.power(self.data['month'].loc[date_curr] * temp / 12, 3),
                  np.power(self.data['sp_index'].loc[date_curr] * temp / 100, 3)))
             var_3d = np.vstack((var_3d, v))
@@ -698,7 +687,6 @@ class dataset_creator_xmachina():
                     (self.data.loc[d, 'Athens_24'], self.data.loc[d, 'Athens_6'],
                      self.data[['temp_min', 'temp_mean', 'rh', 'hdd_h', 'hdd_h2']].loc[d].values,
                      temp,
-                     self.data.loc[d, 'Αριθμός Πελατών από 1/1/2017'],
                      np.power(self.data['month'].loc[date] * temp / 12, 3),
                      np.power(self.data['sp_index'].loc[date] * temp / 100, 3)))
                 var_3d = np.vstack((var_3d, v))
@@ -709,7 +697,6 @@ class dataset_creator_xmachina():
                     (self.data.loc[d, 'Final/Ζητούμενο'], self.data.loc[d, 'Athens_6'],
                      self.data[['temp_min', 'temp_mean', 'rh', 'hdd_h', 'hdd_h2']].loc[d].values,
                      temp,
-                     self.data.loc[d, 'Αριθμός Πελατών από 1/1/2017'],
                      np.power(self.data['month'].loc[date] * temp / 12, 3),
                      np.power(self.data['sp_index'].loc[date] * temp / 100, 3)))
                 var_3d = np.vstack((var_3d, v))

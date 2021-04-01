@@ -15,8 +15,8 @@ RABBIT_MQ_PORT = int(os.getenv('RABBIT_MQ_PORT'))
 server = RPCServer(queue_name='data_manager', host=RABBIT_MQ_HOST, port=RABBIT_MQ_PORT, threaded=False)
 
 
-class Dataset_creator():
-    def __init__(self, static_data ,group_static_data):
+class DatasetCreator:
+    def __init__(self, static_data, group_static_data):
         self.group_static_data = group_static_data
         self.static_data = static_data
         self.file_data = static_data['data_file_name']
@@ -31,53 +31,10 @@ class Dataset_creator():
         self.data_variables = static_data['data_variables']
 
         self.model_type = static_data['type']
-
-
-        if self.static_data['Docker']:
-            if sys.platform == 'linux':
-                self.sys_folder = '/models/'
-                if self.nwp_model == 'skiron' and self.nwp_resolution == 0.05:
-                    self.path_nwp = '/nwp_grib/SKIRON'
-                elif self.nwp_model == 'skiron' and self.nwp_resolution == 0.1:
-                    self.path_nwp = '/nwp_grib/SKIRON_low'
-                elif self.nwp_model == 'ecmwf':
-                    self.path_nwp = '/nwp_grib/ECMWF'
-                else:
-                    self.path_nwp = None
-            else:
-                if self.nwp_model == 'ecmwf':
-                    self.sys_folder = '/models/'
-                    self.path_nwp = '/nwp_grib/ECMWF'
-                else:
-                    self.sys_folder = '/models/'
-                    self.path_nwp = None
-        else:
-            if sys.platform == 'linux':
-                self.sys_folder = '/media/smartrue/HHD1/George/models/'
-                if self.nwp_model == 'skiron' and self.nwp_resolution == 0.05:
-                    self.path_nwp = '/media/smartrue/HHD2/SKIRON'
-                elif self.nwp_model == 'skiron' and self.nwp_resolution == 0.1:
-                    self.path_nwp = '/media/smartrue/HHD2/SKIRON_low'
-                elif self.nwp_model == 'ecmwf':
-                    self.path_nwp = '/media/smartrue/HHD2/ECMWF'
-                else:
-                    self.path_nwp = None
-            else:
-                if self.nwp_model == 'ecmwf':
-                    self.sys_folder = 'D:/models/'
-                    self.path_nwp = 'D:/Dropbox/ECMWF'
-                else:
-                    self.sys_folder = 'D:/models/'
-                    self.path_nwp = None
-
-        self.path_group = self.sys_folder + self.project_owner + '/' + self.projects_group + '_ver' + str(
-            self.version_group) + '/' + self.model_type
-        if not os.path.exists(self.path_group):
-            os.makedirs(self.path_group)
-        self.path_nwp_group = self.sys_folder + self.project_owner + '/' + self.projects_group + '_ver' + str(
-            self.version_group) + '/nwp'
-        if not os.path.exists(self.path_nwp_group):
-            os.makedirs(self.path_nwp_group)
+        self.sys_folder = self.static_data['sys_folder']
+        self.path_nwp = self.static_data['path_nwp']
+        self.path_group = self.static_data['path_group']
+        self.path_nwp_group = self.static_data['path_nwp_group']
         self.create_logger()
 
     def create_logger(self):
@@ -124,7 +81,8 @@ class Dataset_creator():
                 if project['_id'] != self.projects_group + '_' + self.model_type:
                     if data[project['_id']].dropna().count() > 24:
                         if test:
-                            if not os.path.exists(os.path.join(project['static_data']['path_data'], 'dataset_X_test.csv')) \
+                            if not os.path.exists(
+                                    os.path.join(project['static_data']['path_data'], 'dataset_X_test.csv')) \
                                     or not os.path.exists(
                                 os.path.join(project['static_data']['path_data'], 'dataset_y_test.csv')):
                                 self.logger.info('Start created dataset uisng PCA for %s', project['_id'])
@@ -142,29 +100,29 @@ class Dataset_creator():
                                 dataset.make_dataset_res()
                                 self.logger.info('Dataset for training using PCA constructed for %s', project['_id'])
 
-                    elif project['_id'] == self.projects_group + '_' + self.model_type:
-                        if test:
-                            if not os.path.exists(os.path.join(project['static_data']['path_data'], 'dataset_X_test.csv')) \
-                                    or not os.path.exists(
-                                os.path.join(project['static_data']['path_data'], 'dataset_y_test.csv')):
-                                self.logger.info('Start created dataset uisng PCA for %s', project['_id'])
-                                dataset = dataset_creator_dense(self.projects_group, project, data[project['_id']].dropna(),
-                                                                self.path_nwp_group, self.nwp_model,
-                                                                self.nwp_resolution, self.model_type,
-                                                                njobs=self.static_data['njobs'], test=test)
-                                dataset.make_dataset_res()
-                                self.logger.info('Dataset uisng PCA constructed for %s', project['_id'])
-                        else:
-                            if not os.path.exists(os.path.join(project['static_data']['path_data'], 'dataset_X.csv')) \
-                                    or not os.path.exists(
-                                os.path.join(project['static_data']['path_data'], 'dataset_y.csv')):
-                                self.logger.info('Start created dataset uisng PCA for %s', project['_id'])
-                                dataset = dataset_creator_dense(self.projects_group, project, data[project['_id']].dropna(),
-                                                                self.path_nwp_group,
-                                                                self.nwp_model, self.nwp_resolution, self.data_variables,
-                                                                njobs=self.static_data['njobs'], test=test)
-                                dataset.make_dataset_res()
-                                self.logger.info('Dataset uisng PCA constructed for %s', project['_id'])
+                elif project['_id'] == self.projects_group + '_' + self.model_type:
+                    if test:
+                        if not os.path.exists(os.path.join(project['static_data']['path_data'], 'dataset_X_test.csv')) \
+                                or not os.path.exists(
+                            os.path.join(project['static_data']['path_data'], 'dataset_y_test.csv')):
+                            self.logger.info('Start created dataset uisng PCA for %s', project['_id'])
+                            dataset = dataset_creator_dense(self.projects_group, project, data[project['_id']].dropna(),
+                                                            self.path_nwp_group, self.nwp_model,
+                                                            self.nwp_resolution, self.model_type,
+                                                            njobs=self.static_data['njobs'], test=test)
+                            dataset.make_dataset_res()
+                            self.logger.info('Dataset uisng PCA constructed for %s', project['_id'])
+                    else:
+                        if not os.path.exists(os.path.join(project['static_data']['path_data'], 'dataset_X.csv')) \
+                                or not os.path.exists(
+                            os.path.join(project['static_data']['path_data'], 'dataset_y.csv')):
+                            self.logger.info('Start created dataset uisng PCA for %s', project['_id'])
+                            dataset = dataset_creator_dense(self.projects_group, project, data[project['_id']].dropna(),
+                                                            self.path_nwp_group,
+                                                            self.nwp_model, self.nwp_resolution, self.data_variables,
+                                                            njobs=self.static_data['njobs'], test=test)
+                            dataset.make_dataset_res()
+                            self.logger.info('Dataset uisng PCA constructed for %s', project['_id'])
 
         elif self.static_data['compress_data'] == 'dense' and self.model_type in {'pv', 'wind'}:
             project_col = []
@@ -172,7 +130,8 @@ class Dataset_creator():
             for project in self.group_static_data:
                 if test:
                     if not os.path.exists(os.path.join(project['static_data']['path_data'], 'dataset_X_test.csv')) \
-                            or not os.path.exists(os.path.join(project['static_data']['path_data'], 'dataset_y_test.csv')):
+                            or not os.path.exists(
+                        os.path.join(project['static_data']['path_data'], 'dataset_y_test.csv')):
                         if data[project['_id']].dropna().count() > 24:
                             projects.append(project)
                             project_col.append(project['_id'])
@@ -219,8 +178,8 @@ class Dataset_creator():
                         dataset.make_dataset_scada()
                     elif project_col[0] == 'lv_load':
                         dataset = dataset_creator_LV(self.projects_group, projects, data, self.path_nwp_group,
-                                                        self.nwp_model, self.nwp_resolution, self.data_variables,
-                                                        njobs=self.static_data['njobs'], test=test)
+                                                     self.nwp_model, self.nwp_resolution, self.data_variables,
+                                                     njobs=self.static_data['njobs'], test=test)
                         dataset.make_dataset_lv()
 
         elif self.model_type in {'fa'}:
@@ -247,7 +206,7 @@ class Dataset_creator():
                                                     njobs=self.static_data['njobs'], test=test)
                     dataset.make_dataset_ecmwf()
                 elif self.nwp_model == 'xmachina':
-                    if self.version_model==0:
+                    if self.version_model == 0:
                         dataset = dataset_creator_xmachina(self.projects_group, projects, data, self.path_nwp_group,
                                                            self.nwp_model, self.nwp_resolution, self.data_variables,
                                                            njobs=self.static_data['njobs'], test=test)
@@ -261,6 +220,7 @@ class Dataset_creator():
         else:
             raise ValueError('Cannot recognize model_type or dimentional reduction method')
         return 'Done'
+
 
 class NumpyEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -296,3 +256,4 @@ def data_manager(static_data):
 
 if __name__=='__main__':
     server.run()
+

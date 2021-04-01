@@ -1,6 +1,6 @@
 import os
 
-import Fuzzy_clustering.version2.template.config as cg
+import config as cg
 
 
 def write_database():
@@ -12,6 +12,8 @@ def write_database():
                    'version_group': cg.version_group,
                    'version_model': cg.version_model,
                    'type': cg.model_type,
+                   'horizon' : cg.horizon,
+                   'ts_resolution' : cg.ts_resolution,
                    'Evaluation_start': cg.Evaluation,
                    'project_methods': cg.project_methods,
                    'combine_methods': cg.combine_methods,
@@ -80,9 +82,8 @@ def write_database():
                 	   'njobs': cg.njobs_cnn,
                    },
                    'LSTM': {
-                       'filters': cg.filters,
-                       'pool_size': cg.pool_size,
-                       'h_size': cg.h_size,
+                       'units': cg.units,
+                       'hold_prob': cg.hold_prob,
                        'max_iterations': cg.cnn_max_iterations,
                        'learning_rate': cg.cnn_learning_rate,
                        'njobs': cg.njobs_lstm,
@@ -109,6 +110,8 @@ def define_folder_names():
         path_nwp = os.path.join(cg.nwp_folder, 'SKIRON_low')
     elif cg.NWP_model == 'ecmwf':
         path_nwp = os.path.join(cg.nwp_folder, 'ECMWF')
+    elif cg.NWP_model == 'gfs':
+        path_nwp = os.path.join(cg.nwp_folder, 'GFS')
     else:
         path_nwp = None
 

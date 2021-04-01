@@ -8,34 +8,36 @@ from Fuzzy_clustering.version2.probabilistic_manager.mlp_tf_core import MLP
 
 class proba_model_manager():
     def __init__(self, static_data, params={}):
+
+        self.istrained = False
+        self.method = 'mlp'
+        self.static_data = static_data
+        self.model_dir = os.path.join(static_data['path_model'], 'Probabilistic')
+        self.data_dir = self.static_data['path_data']
         if len(params) > 0:
             self.params = params
             self.test = params['test']
             self.test_dir = os.path.join(self.model_dir, 'test_' + str(self.test))
-        self.istrained = False
-        self.method = 'mlp'
-        self.model_dir = os.path.join(static_data['path_model'], 'Probabilistic')
-        self.data_dir = self.static_data['path_data']
-
-        if hasattr(self, 'test'):
+        if hasattr(self, 'test_dir'):
             try:
+                if not os.path.exists(self.test_dir):
+                    os.makedirs(self.test_dir)
                 self.load(self.test_dir)
             except:
                 pass
         else:
             try:
+                if not os.path.exists(self.model_dir):
+                    os.makedirs(self.model_dir)
                 self.load(self.model_dir)
             except:
                 pass
 
-        self.static_data = static_data
         self.cluster_name = static_data['_id']
         self.rated = static_data['rated']
         self.probabilistic = True
-        if not os.path.exists(self.model_dir):
-            os.makedirs(self.model_dir)
-        if not os.path.exists(self.test_dir):
-            os.makedirs(self.test_dir)
+
+
 
     def fit(self):
         if self.istrained == False:
@@ -67,13 +69,22 @@ class proba_model_manager():
         lstm_max_iterations = self.static_data['MLP']['max_iterations']
         self.hold_prob = self.static_data['MLP']['hold_prob']
         cvs = self.load_data()
-        lstm = MLP(self.static_data, self.rated, cvs[0], cvs[1], cvs[2], cvs[3], cvs[4], cvs[5], trial=self.trial,
-                   probabilistc=self.probabilistic)
+        self.N = cvs[0][0].shape[1]
+        self.D = cvs[0][0].shape[0] + cvs[0][2].shape[0] + cvs[0][4].shape[0]
+
+        X_train = cvs[0][0]
+        y_train = cvs[0][1].reshape(-1, 1)
+        X_val = cvs[0][2]
+        y_val = cvs[0][3].reshape(-1, 1)
+        X_test = cvs[0][4]
+        y_test = cvs[0][5].reshape(-1, 1)
+
+        mlp = MLP(self.static_data, self.rated, X_train, y_train, X_val, y_val, X_test, y_test, trial=self.trial,
+                  probabilistc=self.probabilistic)
         # try:
-        self.acc, self.scale_lstm, self.model = lstm.train(max_iterations=lstm_max_iterations,
-                                                           learning_rate=self.lr, units=self.units,
-                                                           hold_prob=self.hold_prob, act_func=self.act_func,
-                                                           gpu_id=self.gpu)
+        self.acc, self.model = mlp.train(max_iterations=lstm_max_iterations,
+                                         learning_rate=self.lr, units=self.units,
+                                         hold_prob=self.hold_prob, act_func=self.act_func, gpu_id=self.gpu)
         # except:
         #     acc_old_lstm=np.inf
         #     scale_lstm=None

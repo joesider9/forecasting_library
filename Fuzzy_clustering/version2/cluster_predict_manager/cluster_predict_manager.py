@@ -64,6 +64,10 @@ class ClusterPredict():
             model = model3d(self.static_data, self.cluster, method)
             pred = model.predict(X_lstm)
             pred[np.where(pred < 0)] = 0
+        elif method in {'MLP_3D'}:
+            model = model3d(self.static_data, self.cluster, method)
+            pred = model.predict(X)
+            pred[np.where(pred < 0)] = 0
         elif method in {'SVM', 'NUSVM', 'MLP', 'RF', 'XGB', 'elasticnet'}:
             model = SKLearn_Model(self.static_data, self.cluster, method)
             pred = model.predict(X)

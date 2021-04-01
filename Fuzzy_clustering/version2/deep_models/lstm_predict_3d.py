@@ -1,7 +1,7 @@
 import tensorflow as tf
 
 
-class LSTM_3d_predict():
+class Lstm3dPredict:
     def __init__(self, model, scale_lstm, trial, probabilistic):
         self.scale_lstm = scale_lstm
         self.trial = trial

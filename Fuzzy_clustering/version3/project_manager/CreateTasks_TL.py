@@ -1,6 +1,4 @@
 import numpy as np
-import pandas as pd
-import copy
 
 
 class TaskCreator_TL():
@@ -13,7 +11,7 @@ class TaskCreator_TL():
         for method in sklearn_methods:
             for project in projects:
                 for cluster_name, cluster in project.clusters.items():
-                    if cluster.istrained == False:
+                    if cluster.is_trained == False:
                         task = {'project': project.static_data['_id'], 'static_data': project.static_data,
                                 'cluster': cluster, 'method': method,
                                 'optimize_method': project.static_data['sklearn']['optimizer']}
@@ -44,7 +42,7 @@ class TaskCreator_TL():
 
         for project in projects:
             for cluster_name, cluster in project.clusters.items():
-                if cluster.istrained == False:
+                if cluster.is_trained == False:
                     if ('RBF_ALL_CNN' in cluster.methods):
 
                         task = {'method': 'RBF-CNN', 'project': project.static_data['_id'], 'cluster': cluster,
@@ -67,8 +65,9 @@ class TaskCreator_TL():
         tasks_rbf_ols = []
         for project in projects:
             for cluster_name, cluster in project.clusters.items():
-                if cluster.istrained == False:
-                    task = {'project': project.static_data['_id'], 'static_data': project.static_data, 'cluster': cluster}
+                if cluster.is_trained == False:
+                    task = {'project': project.static_data['_id'], 'static_data': project.static_data,
+                            'cluster': cluster}
                     tasks_rbf_ols.append(task)
 
         task_rbf_stage1 = dict()
@@ -92,7 +91,7 @@ class TaskCreator_TL():
 
         for project in projects:
             for cluster_name, cluster in project.clusters.items():
-                if cluster.istrained == False:
+                if cluster.is_trained == False:
                     if ('RBF_ALL_CNN' in cluster.methods) or ('RBF_ALL' in cluster.methods):
 
                         task = {'method': 'RBFNN', 'project': project.static_data['_id'], 'cluster': cluster,
@@ -113,7 +112,7 @@ class TaskCreator_TL():
         tasks_fs = []
         for project in projects:
             for cluster_name, cluster in project.clusters.items():
-                if cluster.istrained == False:
+                if cluster.is_trained == False:
                     task = {'project': project.static_data['_id'], 'cluster': cluster}
                     tasks_fs.append(task)
 
@@ -138,7 +137,7 @@ class TaskCreator_TL():
 
         for project in projects:
             for cluster_name, cluster in project.clusters.items():
-                if cluster.istrained == False:
+                if cluster.is_trained == False:
                     if 'LSTM' in cluster.methods:
                         min_units = np.maximum(cluster.D, 64)
                         lr = project.static_data['LSTM']['learning_rate']
@@ -158,7 +157,7 @@ class TaskCreator_TL():
         gpu = 0
         for project in projects:
             for cluster_name, cluster in project.clusters.items():
-                if cluster.istrained == False:
+                if cluster.is_trained == False:
                     if 'CNN' in cluster.methods:
 
                         task = {'method': 'CNN', 'project': project.static_data['_id'], 'cluster': cluster,

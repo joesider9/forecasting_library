@@ -7,8 +7,21 @@ import pandas as pd
 from Fuzzy_clustering.version2.common_utils.logging import create_logger
 
 
-# FIXME: Not an intuitive name, maybe change to something that states the fact that we're loading the
-#  power measurements of parks (PowerMeasurements ?? )
+def compute_area_grid(lat, long, resolution, round_coord, levels):
+    lat_range = np.arange(np.around(lat, round_coord) - 20, np.around(lat, round_coord) + 20,
+                          resolution)
+    lat1 = lat_range[np.abs(lat_range - lat).argmin()] - resolution / 10
+    lat2 = lat_range[np.abs(lat_range - lat).argmin()] + resolution / 10
+
+    long_range = np.arange(np.around(long, round_coord) - 20, np.around(long, round_coord) + 20,
+                           resolution)
+    long1 = long_range[np.abs(long_range - long).argmin()] - resolution / 10
+    long2 = long_range[np.abs(long_range - long).argmin()] + resolution / 10
+
+    return [[lat1 - resolution * levels, long1 - resolution * levels],
+            [lat2 + resolution * levels, long2 + resolution * levels]]
+
+
 class ProjectGroupInit:
     """
     Class responsible for managing and loading the
@@ -24,13 +37,13 @@ class ProjectGroupInit:
         static_data: python dict
             contains all the information required to load the power measurement for specific project(s).
         """
-        self.static_data = static_data  # dict contains all information about project paths, model structure and training
-        # params, input file, see in util_database.py and config.py
+        self.static_data = static_data  # dict containing information about project paths, model structure and training
+        # params, input file, see in util_database_timos.py and config_timos.py
         self.file_data = static_data['data_file_name']  # input .csv file PROBLEM_TYPE + '_ts.csv' i.e. wind_ts.csv
         self.project_owner = static_data[
             'project_owner']  # Name of project owner or research program i.e. my_projects or CROSSBOW
         self.projects_group = static_data['projects_group']  # Name of the country
-        self.area_group = static_data['area_group']  # coords of the country
+        self.area_group = static_data['area_group']  # coordinates of the country
         self.version_group = static_data['version_group']
         self.version_model = static_data['version_model']
         self.weather_in_data = static_data[
@@ -40,14 +53,14 @@ class ProjectGroupInit:
         self.data_variables = static_data['data_variables']  # Variable names used
 
         self.projects = []  # list containing all the parks, we're interested in. Each park is considered as a project.
-        self.model_type = static_data['type']
+        self.use_rated = True
 
         self.model_type = self.static_data['type']
         self.sys_folder = self.static_data['sys_folder']
         self.path_nwp = self.static_data['path_nwp']
         self.path_group = self.static_data['path_group']
         self.path_nwp_group = self.static_data['path_nwp_group']
-
+        self.group_static_data = []
         self.logger = create_logger(logger_name=f'ProjectInitManager_{self.model_type}', abs_path=self.path_group,
                                     logger_path=f'log_{self.projects_group}.log', write_type='a')
 
@@ -56,21 +69,23 @@ class ProjectGroupInit:
             self.file_coord = os.path.join(os.path.dirname(self.file_data), 'coord_auto_' + self.model_type + '.csv')
         else:
             self.file_coord = os.path.join(os.path.dirname(self.file_data), 'coord_' + self.model_type + '.csv')
+
         if not os.path.exists(self.file_coord) and not self.weather_in_data:
             raise IOError('File with coordinates does not exist')
 
         self.file_rated = os.path.join(os.path.dirname(self.file_data), 'rated_' + self.model_type + '.csv')
         if not os.path.exists(self.file_rated):
-            if self.model_type in {'wind', 'pv'} and self.projects_group not in {'APE_net'}:
+            if self.model_type in {'wind', 'pv'} and self.projects_group not in {'IPTO'}:
                 raise ValueError('Provide rated_power for each project. The type of projects is %s', self.model_type)
             self.use_rated = False
         else:
             self.use_rated = True
 
-        self.load_power_of_parks()
+        self.load_power_of_parks()  # Loads power output, coordinates and rated power.
+
         if len(self.projects) == 0:
             raise ImportError('No project loaded. check the input file in configuration')
-        self.group_static_data = []
+
         if self.check_project_names():
             for project_name in self.projects:
                 path_project = self.path_group + '/' + project_name
@@ -99,10 +114,10 @@ class ProjectGroupInit:
                 if hasattr(self, 'coord'):
                     if project_name == 'APE_net' or self.model_type == 'load' or project_name == self.projects_group + '_' + self.model_type:
                         coord = dict()
-                        for name, latlong in self.coord.iterrows():
-                            coord[name] = latlong.values.tolist()
+                        for name, lat_long in self.coord.iterrows():
+                            coord[name] = lat_long.values.tolist()
                     else:
-                        coord = self.coord.loc[project_name].to_list()
+                        coord = self.coord.loc[project_name].to_list()  # [lat, long]
                 else:
                     coord = None
                 area = self.create_area(coord)
@@ -153,7 +168,7 @@ class ProjectGroupInit:
                     flag = False
                     self.logger.info('There is inconsistency to files data and coord for the project %s', name)
             if not flag:
-                raise ValueError('Inconcistency in project names between data and coord')
+                raise ValueError('Inconsistency in project names between data and coord')
 
         if self.use_rated:
             for name in self.projects:
@@ -161,7 +176,7 @@ class ProjectGroupInit:
                     flag = False
                     self.logger.info('There is inconsistency to files data and rated for the project %s', name)
             if not flag:
-                raise ValueError('Inconcistency in project names between data and rated')
+                raise ValueError('Inconsistency in project names between data and rated')
 
         return flag
 
@@ -178,7 +193,8 @@ class ProjectGroupInit:
             self.data = self.data.rename(
                 columns={'total': self.projects_group + '_' + self.model_type})  # e.g group = 'Greece'
 
-        if self.static_data['Evaluation_start']:  # TODO: Why all these different time offsets?
+        if self.static_data['Evaluation_start']:
+
             valid_combination = True
             time_offset = pd.DateOffset(hours=0)
 
@@ -186,17 +202,20 @@ class ProjectGroupInit:
                 time_offset = pd.DateOffset(days=372)
             elif self.model_type == 'load':
                 if self.data.columns[0] == 'lv_load':
-                    time_offset = pd.DateOffset(days=372)
-                elif self.data.columns[0] == 'SCADA':
-                    time_offset = pd.DateOffset(hours=9001)
+                    time_offset = pd.DateOffset(days=9001)
                 else:
-                    valid_combination = False
+                    if self.static_data['horizon'] == 'short-term':
+                        time_offset = pd.DateOffset(hours = 350)
+                    else:
+                        if self.static_data['ts_resolution'] == 'hourly':
+                            time_offset = pd.DateOffset(hours = 9001)
+                        elif self.static_data['ts_resolution'] == '15min':
+                            time_offset = pd.DateOffset(minutes = 60 * 9001)
 
             if valid_combination:
                 try:
                     eval_date = pd.to_datetime(self.static_data['Evaluation_start'], format='%d%m%Y %H:%M')
-                    self.data_eval = self.data.iloc[
-                        np.where(self.data.index > eval_date - time_offset)]
+                    self.data_eval = self.data.iloc[np.where(self.data.index > eval_date - time_offset)]
                     self.data = self.data.iloc[np.where(self.data.index <= eval_date)]
                 except Exception:
                     raise ValueError('Wrong date format, use %d%m%Y %H:%M. Or the date does not exist in the dataset')
@@ -213,10 +232,8 @@ class ProjectGroupInit:
                     'Version model should be 0 for current day and 1 for day ahead otherwise choose another group version')
         else:
             for name in self.data.columns:
-                if name == 'total':
-                    name = self.projects_group + '_' + self.model_type
-                self.projects.append(name)
-
+                var = f'{self.projects_group}_{self.model_type}' if name == 'total' else name
+                self.projects.append(var)
         if not self.weather_in_data:
             try:
                 # For each of the park, load its coordinates. (lat,long) single tuple
@@ -240,59 +257,31 @@ class ProjectGroupInit:
         self.logger.info('Data loaded successfully')
 
     def create_area(self, coord):
-        if self.nwp_resolution == 0.05:
-            levels = 4
-            round_coord = 1
-        else:
-            levels = 2
-            round_coord = 0
+        levels = 4 if self.nwp_resolution == 0.05 else 2
+        round_coord = 1 if self.nwp_resolution == 0.05 else 0
 
-        if coord is not None:
-            if isinstance(coord, list):
-                if len(coord) == 2:
-                    lat = coord[0]
-                    long = coord[1]
-                    lat_range = np.arange(np.around(lat, round_coord) - 20, np.around(lat, round_coord) + 20,
-                                          self.nwp_resolution)
-                    lat1 = lat_range[np.abs(lat_range - lat).argmin()] - self.nwp_resolution / 10
-                    lat2 = lat_range[np.abs(lat_range - lat).argmin()] + self.nwp_resolution / 10
-
-                    long_range = np.arange(np.around(long, round_coord) - 20, np.around(long, round_coord) + 20,
-                                           self.nwp_resolution)
-                    long1 = long_range[np.abs(long_range - long).argmin()] - self.nwp_resolution / 10
-                    long2 = long_range[np.abs(long_range - long).argmin()] + self.nwp_resolution / 10
-
-                    area = [[lat1 - self.nwp_resolution * levels, long1 - self.nwp_resolution * levels],
-                            [lat2 + self.nwp_resolution * levels, long2 + self.nwp_resolution * levels]]
-                elif len(coord) == 4:
-                    area = list(np.array(coord).reshape(2, 2))
-                else:
-                    raise ValueError(
-                        'Wrong coordinates. Should be point (lat, long) or area [lat1, long1, lat2, long2]')
-            elif isinstance(coord, dict):
-                area = dict()
-                for key, value in coord.items():
-                    if len(value) == 2:
-                        lat = value[0]
-                        long = value[1]
-                        lat_range = np.arange(np.around(lat, round_coord) - 20, np.around(lat, round_coord) + 20,
-                                              self.nwp_resolution)
-                        lat1 = lat_range[np.abs(lat_range - lat).argmin()] - self.nwp_resolution / 10
-                        lat2 = lat_range[np.abs(lat_range - lat).argmin()] + self.nwp_resolution / 10
-
-                        long_range = np.arange(np.around(long, round_coord) - 20, np.around(long, round_coord) + 20,
-                                               self.nwp_resolution)
-                        long1 = long_range[np.abs(long_range - long).argmin()] - self.nwp_resolution / 10
-                        long2 = long_range[np.abs(long_range - long).argmin()] + self.nwp_resolution / 10
-
-                        area[key] = [[lat1 - self.nwp_resolution * levels, long1 - self.nwp_resolution * levels],
-                                     [lat2 + self.nwp_resolution * levels, long2 + self.nwp_resolution * levels]]
-                    else:
-                        area[key] = np.array(value).reshape(2, 2)
-            else:
-                raise ValueError('Wrong coordinates. Should be dict or list')
-        else:
+        if coord is None:
             area = dict()
-        self.logger.info('Areas created succesfully')
+        elif isinstance(coord, list):
+            if len(coord) == 2:
+                lat, long = coord[0], coord[1]
+                area = compute_area_grid(lat, long, self.nwp_resolution, round_coord, levels)
+            elif len(coord) == 4:
+                area = list(np.array(coord).reshape(2, 2))
+            else:
+                raise ValueError(
+                    'Wrong coordinates. Should be point (lat, long) or area [lat1, long1, lat2, long2]')
+        elif isinstance(coord, dict):
+            area = dict()
+            for key, value in coord.items():
+                if len(value) == 2:
+                    lat, long = value[0], value[1]
+                    area[key] = compute_area_grid(lat, long, self.nwp_resolution, round_coord, levels)
+                else:
+                    area[key] = np.array(value).reshape(2, 2)
+        else:
+            raise ValueError('Wrong coordinates. Should be dict or list')
+
+        self.logger.info('Areas created successfully')
 
         return area

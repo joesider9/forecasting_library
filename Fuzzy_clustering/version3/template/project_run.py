@@ -1,7 +1,7 @@
 from Fuzzy_clustering.version2.project_manager.project_eval_manager import ProjectsEvalManager
 from Fuzzy_clustering.version2.project_manager.projects_data_manager import ProjectsDataManager
 from Fuzzy_clustering.version2.project_manager.projects_train_manager import ProjectsTrainManager
-from Fuzzy_clustering.version2.template.util_database import write_database
+from Fuzzy_clustering.version2.template.util_database_timos import write_database
 
 
 def prepare_data():

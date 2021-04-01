@@ -140,7 +140,7 @@ class sklearn_model(object):
                     params = {
                         'max_depth': [1, 2, 3, 5, 10, 16, 24, 36, 52, 76, 96, 128, 150],
                     }
-                    model = RandomForestRegressor(n_estimators=100, n_jobs=inner_jobs, random_state=42,
+                    model = RandomForestRegressor(n_estimators=200, n_jobs=-1, random_state=42,
                                                   max_features=2 / 3)
                     ngen = 2
                     npop = 4

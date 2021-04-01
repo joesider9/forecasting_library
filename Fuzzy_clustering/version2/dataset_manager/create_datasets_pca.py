@@ -1,4 +1,3 @@
-import logging
 import os
 
 import joblib
@@ -7,149 +6,21 @@ import pandas as pd
 from joblib import Parallel
 from joblib import delayed
 from pytz import timezone
-from scipy.interpolate import interp2d
 from sklearn.decomposition import KernelPCA
-from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import GridSearchCV
 from sklearn.preprocessing import MinMaxScaler
 
 from Fuzzy_clustering.version2.common_utils.logging import create_logger
-
-
-def my_scorer(estimator, X):
-    X_reduced = estimator.transform(X)
-    X_preimage = estimator.inverse_transform(X_reduced)
-    return -1 * mean_squared_error(X, X_preimage)
-
-
-def rescale(arr, nrows, ncol):
-    W, H = arr.shape
-    new_W, new_H = (nrows, ncol)
-    xrange = lambda x: np.linspace(0, 1, x)
-
-    f = interp2d(xrange(H), xrange(W), arr, kind="linear")
-    new_arr = f(xrange(new_H), xrange(new_W))
-
-    return new_arr
-
-
-def rescale_mean(arr):
-    arr_new = np.zeros([int(np.ceil(arr.shape[0] / 2)), int(np.ceil(arr.shape[1] / 2))])
-    for i in range(0, arr.shape[0], 2):
-        for j in range(0, arr.shape[1], 2):
-            arr_new[int((i + 1) / 2), int((j + 1) / 2)] = np.mean(arr[i:i + 2, j:j + 2])
-    return arr_new
-
-
-def stack_2d(X, sample, compress):
-    if compress:
-        sample = rescale_mean(sample)
-
-    if len(sample.shape) == 3:
-        if X.shape[0] == 0:
-            X = sample
-        elif len(X.shape) == 3:
-            X = np.stack((X, sample))
-        else:
-            X = np.vstack((X, sample[np.newaxis, :, :, :]))
-    elif len(sample.shape) == 2:
-        if X.shape[0] == 0:
-            X = sample
-        elif len(X.shape) == 2:
-            X = np.stack((X, sample))
-        else:
-            X = np.vstack((X, sample[np.newaxis, :, :]))
-    elif len(sample.shape) == 4:
-        if X.shape[0] == 0:
-            X = sample
-        elif len(X.shape) == 4:
-            X = np.stack((X, sample))
-        else:
-            X = np.vstack((X, sample[np.newaxis, :, :, :, :]))
-    return X
-
-
-def stack_3d(X, sample):
-    if X.shape[0] == 0:
-        X = sample
-    elif len(sample.shape) != len(X.shape):
-        X = np.vstack((X, sample[np.newaxis]))
-    else:
-        X = np.vstack((X, sample))
-    return X
-
-
-def check_empty_nwp(nwp, nwp_next, nwp_prev, variables):
-    flag = True
-    for var in variables:
-        if nwp[var].shape[0] == 0 and nwp_next[var].shape[0] == 0 and nwp_prev[var].shape[0] == 0:
-            flag = False
-            break
-    return flag
-
-
-def stack_daily_nwps(t, p_dates, path_nwp_project, nwp_model, areas, variables, compress, model_type):
-    x = np.array([])
-    x_3d = np.array([])
-    data_var = dict()
-    for var in variables:
-        if ((var == 'WS') and (model_type == 'wind')) or ((var == 'Flux') and (model_type == 'pv')):
-            data_var[var + '_prev'] = x
-            data_var[var] = x
-            data_var[var + '_next'] = x
-        else:
-            data_var[var] = x
-        data_var['dates'] = x
-
-    fname = os.path.join(path_nwp_project, nwp_model + '_' + t.strftime('%d%m%y') + '.pickle')
-    if os.path.exists(fname):
-        nwps = joblib.load(fname)
-
-        for date in p_dates:
-            try:
-                nwp = nwps[date]
-                if len(nwp['lat'].shape) == 1:
-                    nwp['lat'] = nwp['lat'][:, np.newaxis]
-                if len(nwp['long'].shape) == 1:
-                    nwp['long'] = nwp['long'][np.newaxis, :]
-                lats = (np.where((nwp['lat'][:, 0] >= areas[0][0]) & (nwp['lat'][:, 0] <= areas[1][0])))[0]
-                longs = (np.where((nwp['long'][0, :] >= areas[0][1]) & (nwp['long'][0, :] <= areas[1][1])))[0]
-                break
-            except:
-                continue
-        try:
-            for date in p_dates:
-
-                nwp = nwps[date]
-                date = pd.to_datetime(date, format='%d%m%y%H%M')
-                nwp_prev = nwps[(date - pd.DateOffset(hours=1)).strftime('%d%m%y%H%M')]
-                nwp_next = nwps[(date + pd.DateOffset(hours=1)).strftime('%d%m%y%H%M')]
-                if check_empty_nwp(nwp, nwp_next, nwp_prev, variables):
-                    data_var['dates'] = np.hstack((data_var['dates'], date))
-                    x_2d = np.array([])
-                    for var in sorted(variables):
-                        if ((var == 'WS') and (model_type == 'wind')) or ((var == 'Flux') and (model_type == 'pv')):
-                            data_var[var + '_prev'] = stack_2d(data_var[var + '_prev'],
-                                                               nwp_prev[var][np.ix_(lats, longs)], compress)
-                            data_var[var] = stack_2d(data_var[var], nwp[var][np.ix_(lats, longs)], compress)
-                            data_var[var + '_next'] = stack_2d(data_var[var + '_next'],
-                                                               nwp_next[var][np.ix_(lats, longs)], compress)
-                            x_2d = stack_2d(x_2d, nwp_prev[var][np.ix_(lats, longs)], compress)
-                            x_2d = stack_2d(x_2d, nwp[var][np.ix_(lats, longs)], compress)
-                            x_2d = stack_2d(x_2d, nwp_next[var][np.ix_(lats, longs)], compress)
-                        else:
-                            data_var[var] = stack_2d(data_var[var], nwp[var][np.ix_(lats, longs)], compress)
-                            x_2d = stack_2d(x_2d, nwp[var][np.ix_(lats, longs)], compress)
-                    x_3d = stack_2d(x_3d, x_2d, False)
-        except:
-            pass
-        print(t.strftime('%d%m%y%H%M'), ' extracted')
-    return (data_var, x_3d, t.strftime('%d%m%y%H%M'))
+from Fuzzy_clustering.version2.dataset_manager.common_utils import my_scorer
+from Fuzzy_clustering.version2.dataset_manager.common_utils import stack_3d
+from Fuzzy_clustering.version2.dataset_manager.common_utils import stack_daily_nwps
 
 
 class DatasetCreatorPCA:
 
     def __init__(self, project, data=None, n_jobs=1, test=False, dates=None):
+        if test is None:
+            raise NotImplemented('test is none for short-term, not implemented for PCA')
         self.data = data
         self.is_for_test = test
         self.project_name = project['_id']
@@ -161,22 +32,20 @@ class DatasetCreatorPCA:
         self.nwp_model = self.static_data['NWP_model']
         self.nwp_resolution = self.static_data['NWP_resolution']
         self.location = self.static_data['location']
-        if self.nwp_resolution == 0.05:
-            self.compress = True
-        else:
-            self.compress = False
+        self.compress = True if self.nwp_resolution == 0.05 else False
         self.n_jobs = n_jobs
         self.variables = self.static_data['data_variables']
+
+        self.logger = create_logger(logger_name=f"log_{self.static_data['project_group']}",
+                                    abs_path=self.path_nwp_project,
+                                    logger_path=f"log_{self.static_data['project_group']}.log", write_type='a')
         if self.data is not None:
             self.dates = self.check_dates()
         elif dates is not None:
             self.dates = dates
 
-        self.logger = create_logger(logger_name=f"log_{self.static_data['project_group']}",
-                                    abs_path=self.path_nwp_project,
-                                    logger_path=f"log_{self.static_data['project_group']}.log", write_type='a')
-
     def check_dates(self):
+
         # Extract dates of power measurements.
         start_date = pd.to_datetime(self.data.index[0].strftime('%d%m%y'), format='%d%m%y')
         end_date = pd.to_datetime(self.data.index[-1].strftime('%d%m%y'), format='%d%m%y')
@@ -213,9 +82,9 @@ class DatasetCreatorPCA:
             flag = False
             for i, p_dates in enumerate(dates_stack):
                 t = self.dates[i]
-                fname = os.path.join(self.path_nwp_project, self.nwp_model + '_' + t.strftime('%d%m%y') + '.pickle')
-                if os.path.exists(fname):
-                    nwps = joblib.load(fname)
+                file_name = os.path.join(self.path_nwp_project, self.nwp_model + '_' + t.strftime('%d%m%y') + '.pickle')
+                if os.path.exists(file_name):
+                    nwps = joblib.load(file_name)
 
                     for date in p_dates:
                         try:
@@ -232,12 +101,38 @@ class DatasetCreatorPCA:
                             longs_group = nwp['long'][:, longs]
                             flag = True
                             break
-                        except:
+                        except Exception:
                             continue
                 if flag:
                     break
 
             self.dataset_for_multiple_farms(data, self.areas, lats_group, longs_group)
+    def correct_nwps(self, nwp, variables):
+        if nwp['lat'].shape[0] == 0:
+            area_group = self.projects[0]['static_data']['area_group']
+            resolution = self.projects[0]['static_data']['NWP_resolution']
+            nwp['lat'] = np.arange(area_group[0][0], area_group[1][0] + resolution / 2,
+                                   resolution).reshape(-1, 1)
+            nwp['long'] = np.arange(area_group[0][1], area_group[1][1] + resolution / 2,
+                                    resolution).reshape(-1, 1).T
+        for var in nwp.keys():
+            if not var in {'lat', 'long'}:
+                if nwp['lat'].shape[0] != nwp[var].shape[0]:
+                    nwp[var] = nwp[var].T
+
+        if 'WS' in variables and not 'WS' in nwp.keys():
+            if 'Uwind' in nwp.keys() and 'Vwind' in nwp.keys():
+                if nwp['Uwind'].shape[0] > 0 and nwp['Vwind'].shape[0] > 0:
+                    r2d = 45.0 / np.arctan(1.0)
+                    wspeed = np.sqrt(np.square(nwp['Uwind']) + np.square(nwp['Vwind']))
+                    wdir = np.arctan2(nwp['Uwind'], nwp['Vwind']) * r2d + 180
+                    nwp['WS'] = wspeed
+                    nwp['WD'] = wdir
+        if 'Temp' in nwp.keys():
+            nwp['Temperature'] = nwp['Temp']
+            del nwp['Temp']
+
+        return nwp
 
     def get_3d_dataset(self):
 
@@ -249,6 +144,9 @@ class DatasetCreatorPCA:
             dates_stack.append(dates)  # For each date we have prediction append the next 47 hours
 
         area = self.area_group if isinstance(self.areas, dict) else self.areas
+        nwp = stack_daily_nwps(self.dates[0], dates_stack[0], self.path_nwp_project,
+                                      self.nwp_model, area, self.variables,
+                                      self.compress, self.static_data['type'])
         nwp_daily = Parallel(n_jobs=self.n_jobs)(
             delayed(stack_daily_nwps)(self.dates[i], p_dates, self.path_nwp_project,
                                       self.nwp_model, area, self.variables,
@@ -671,8 +569,7 @@ class DatasetCreatorPCA:
                 dates_stack.append(dates)
 
         if not isinstance(self.areas, dict):
-            nwp = stack_daily_nwps(self.dates[0], dates_stack[0], self.path_nwp_project, self.nwp_model, self.areas,
-                                   self.variables, self.compress, self.static_data['type'])
+
             nwp_daily = Parallel(n_jobs=self.n_jobs)(
                 delayed(stack_daily_nwps)(self.dates[i], pdates, self.path_nwp_project, self.nwp_model,
                                           self.areas, self.variables, self.compress, self.static_data['type'])

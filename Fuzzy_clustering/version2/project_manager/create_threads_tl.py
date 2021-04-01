@@ -4,10 +4,9 @@ import os
 from joblib import Parallel
 from joblib import delayed
 
-from Fuzzy_clustering.version2.project_manager.create_tasks_tl import TaskCreator_TL
-from Fuzzy_clustering.version2.deep_models.model_3d_manager import model3d_manager
+from Fuzzy_clustering.version2.deep_models.model_3d_manager import Model3dManager
 from Fuzzy_clustering.version2.feature_selection_manager.fs_manager import FeatSelManager
-from Fuzzy_clustering.version2.rbf_ols_manager.rbf_ols_manager import RBFOLS_Manager
+from Fuzzy_clustering.version2.rbf_ols_manager.rbf_ols_manager import RbfOlsManager
 from Fuzzy_clustering.version2.sklearn_models.sklearn_manager import SKLearn_Manager
 
 
@@ -20,7 +19,7 @@ def FS_TL_thread(project_id, cluster):
 
 
 def Model3dThread_TL(project_id, static_data, cluster, method, params):
-    model = model3d_manager(static_data, cluster, method, params)
+    model = Model3dManager(static_data, cluster, method, params)
     if model.istrained == False:
         acc = model.fit_TL()
     else:
@@ -30,7 +29,7 @@ def Model3dThread_TL(project_id, static_data, cluster, method, params):
 
 
 def RBFOLS_thread_TL(project_id, static_data, cluster):
-    rbf_model = RBFOLS_Manager(static_data, cluster)
+    rbf_model = RbfOlsManager(static_data, cluster)
     if rbf_model.istrained == False:
         return rbf_model.fit_TL(), cluster.cluster_name, project_id
     else:

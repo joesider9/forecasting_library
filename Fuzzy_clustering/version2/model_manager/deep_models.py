@@ -3,7 +3,7 @@ import os
 import joblib
 
 
-class model3d():
+class Model3d:
     def __init__(self, static_data, cluster, method):
         self.method = str.lower(method)
         self.istrained = False
@@ -22,6 +22,8 @@ class model3d():
 
         except:
             pass
+        if hasattr(self, 'istrained'):
+            self.istrained = self.istrained
 
         self.static_data = static_data
         self.cluster_name = cluster.cluster_name

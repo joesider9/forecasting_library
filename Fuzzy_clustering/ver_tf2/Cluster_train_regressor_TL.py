@@ -2,6 +2,7 @@ import os
 import pickle
 import numpy as np
 import pandas as pd
+from sklearn.model_selection import train_test_split
 
 from Fuzzy_clustering.ver_tf2.utils_for_forecast import split_continuous
 
@@ -9,7 +10,11 @@ from Fuzzy_clustering.ver_tf2.RBFNN_module import rbf_model
 from Fuzzy_clustering.ver_tf2.RBF_ols import rbf_ols_module
 from Fuzzy_clustering.ver_tf2.CNN_module import cnn_model
 from Fuzzy_clustering.ver_tf2.CNN_module_3d import cnn_3d_model
+from Fuzzy_clustering.ver_tf2.Cluster_predict_regressors import cluster_predict
+from Fuzzy_clustering.ver_tf2.Combine_module_train import combine_model
 from Fuzzy_clustering.ver_tf2.LSTM_module_3d import lstm_3d_model
+from Fuzzy_clustering.ver_tf2.RBFNN_module import rbf_model
+from Fuzzy_clustering.ver_tf2.RBF_ols import rbf_ols_module
 from Fuzzy_clustering.ver_tf2.Sklearn_models_TL import sklearn_model_tl
 from Fuzzy_clustering.ver_tf2.Combine_module_train import combine_model
 from Fuzzy_clustering.ver_tf2.Clusterer import clusterer
@@ -26,7 +31,7 @@ import time, logging, warnings, joblib
 class cluster_train_tl(object):
     def __init__(self, static_data, clust, x_scaler, gpu):
         self.istrained = False
-        self.cluster_dir=os.path.join(static_data['path_model'], 'Regressor_layer/' +clust)
+        self.cluster_dir = os.path.join(static_data['path_model'], 'Regressor_layer/' + clust)
         self.cluster_name = clust
         try:
             self.load(self.cluster_dir)

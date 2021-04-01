@@ -1,10 +1,12 @@
 import numpy as np
 import pandas as pd
-from joblib import Parallel, delayed
+from joblib import Parallel
+from joblib import delayed
+
+from Fuzzy_clustering.version3.ClusterCombineManager.FS_object import FeatSelobject
 from Fuzzy_clustering.version3.ClusterCombineManager.Model_3d_object import model3d_object
 from Fuzzy_clustering.version3.ClusterCombineManager.RBF_CNN_model import RBF_CNN_model
 from Fuzzy_clustering.version3.ClusterCombineManager.SKlearn_object import SKLearn_object
-from Fuzzy_clustering.version3.ClusterCombineManager.FS_object import FeatSelobject
 
 
 class MultiEvaluator():
@@ -16,22 +18,23 @@ class MultiEvaluator():
 
     def evaluate(self, X, model):
         partitions = 3000
-        X_list=[]
+        X_list = []
         for i in range(0, X.shape[0], partitions):
-            if (i+partitions+1)>X.shape[0]:
+            if (i + partitions + 1) > X.shape[0]:
                 X_list.append(X[i:])
             else:
-                X_list.append(X[i:i+partitions])
-        pred =Parallel(self.processes)(delayed(self.predict)(i, x, model) for i, x in enumerate(X_list))
+                X_list.append(X[i:i + partitions])
+        pred = Parallel(self.processes)(delayed(self.predict)(i, x, model) for i, x in enumerate(X_list))
         indices = np.array([p[0] for p in pred])
         predictions = np.array([])
         for ind in indices:
-            if len(predictions.shape)==1:
+            if len(predictions.shape) == 1:
                 predictions = pred[ind][1]
             else:
                 predictions = np.vstack((predictions, pred[ind][1]))
 
         return predictions
+
 
 class ClusterPredict():
     def __init__(self, static_data, cluster):
@@ -85,13 +88,12 @@ class ClusterPredict():
             pred = parallel.evaluate(X, model)
         return pred
 
-
     def compute_metrics(self, pred, y, rated):
         if rated == None:
             rated = y.ravel()
         else:
             rated = rated
-        err = np.abs(pred.ravel() - y.ravel())/rated
+        err = np.abs(pred.ravel() - y.ravel()) / rated
         sse = np.sum(np.square(pred.ravel() - y.ravel()))
         rms = np.sqrt(np.mean(np.square(err)))
         mae = np.mean(err)
@@ -108,23 +110,25 @@ class ClusterPredict():
 
     def spark_predict(self, X, X_cnn=np.array([]), X_lstm=np.array([]), fs_reduced=False):
 
-        if fs_reduced==False:
+        if fs_reduced == False:
             fs_manager = FeatSelobject(self.cluster)
-            if fs_manager.istrained==True:
+            if fs_manager.istrained == True:
                 X = fs_manager.transform(X)
 
-        predictions=dict()
+        predictions = dict()
 
         for method in self.methods:
-            if X.shape[0]>0:
+            if X.shape[0] > 0:
                 pred = self.parallel_pred_model(X, method, X_cnn=X_cnn, X_lstm=X_lstm)
 
                 for j in range(pred.shape[1]):
                     if np.any(np.isnan(pred[:, j])):
-                        if np.sum(np.isnan(pred[:, j]))<=X.shape[0]/3:
+                        if np.sum(np.isnan(pred[:, j])) <= X.shape[0] / 3:
                             pred[:, j][np.where(np.isnan(pred[:, j]))] = np.nanmean(pred[:, j])
                         else:
-                            raise ValueError('There are nans in dataset of %s clust or model of method %s is not trained well', self.cluster_name, method)
+                            raise ValueError(
+                                'There are nans in dataset of %s clust or model of method %s is not trained well',
+                                self.cluster_name, method)
 
                 if method == 'RBF_ALL_CNN':
                     predictions['RBF_OLS'] = pred[:, 0].reshape(-1, 1)
@@ -136,7 +140,7 @@ class ClusterPredict():
                     predictions['GA_RBF_OLS'] = pred[:, 1].reshape(-1, 1)
                     predictions['RBFNN'] = pred[:, 2].reshape(-1, 1)
                 else:
-                    if len(pred.shape)==1:
+                    if len(pred.shape) == 1:
                         pred = pred.reshape(-1, 1)
                     predictions[method] = pred
             else:
@@ -156,23 +160,25 @@ class ClusterPredict():
 
     def predict(self, X, X_cnn=np.array([]), X_lstm=np.array([]), fs_reduced=False):
 
-        if fs_reduced==False:
+        if fs_reduced == False:
             fs_manager = FeatSelManager(self.cluster)
-            if fs_manager.istrained==True:
+            if fs_manager.is_trained == True:
                 X = fs_manager.transform(X)
 
-        predictions=dict()
+        predictions = dict()
 
         for method in self.methods:
-            if X.shape[0]>0:
+            if X.shape[0] > 0:
                 pred = self.pred_model(X, method, X_cnn=X_cnn, X_lstm=X_lstm)
 
                 for j in range(pred.shape[1]):
                     if np.any(np.isnan(pred[:, j])):
-                        if np.sum(np.isnan(pred[:, j]))<=X.shape[0]/3:
+                        if np.sum(np.isnan(pred[:, j])) <= X.shape[0] / 3:
                             pred[:, j][np.where(np.isnan(pred[:, j]))] = np.nanmean(pred[:, j])
                         else:
-                            raise ValueError('There are nans in dataset of %s clust or model of method %s is not trained well', self.cluster_name, method)
+                            raise ValueError(
+                                'There are nans in dataset of %s clust or model of method %s is not trained well',
+                                self.cluster_name, method)
 
                 if method == 'RBF_ALL_CNN':
                     predictions['RBF_OLS'] = pred[:, 0].reshape(-1, 1)
@@ -184,7 +190,7 @@ class ClusterPredict():
                     predictions['GA_RBF_OLS'] = pred[:, 1].reshape(-1, 1)
                     predictions['RBFNN'] = pred[:, 2].reshape(-1, 1)
                 else:
-                    if len(pred.shape)==1:
+                    if len(pred.shape) == 1:
                         pred = pred.reshape(-1, 1)
                     predictions[method] = pred
             else:

@@ -1,6 +1,8 @@
 import logging
 import os
 import pickle
+import glob
+import shutil
 
 import joblib
 import numpy as np
@@ -10,8 +12,8 @@ from joblib import delayed
 
 from Fuzzy_clustering.version2.cluster_predict_manager.cluster_predict_manager import ClusterPredict
 from Fuzzy_clustering.version2.combine_model_manager.combine_model_predict import CombineModelPredict
-from Fuzzy_clustering.version2.fuzzy_clustering_manager.clusterer import clusterer
-from Fuzzy_clustering.version2.model_manager.data_manage_clusters import cluster_object
+from Fuzzy_clustering.version2.fuzzy_clustering_manager.clusterer import Clusterer
+from Fuzzy_clustering.version2.model_manager.data_manage_clusters import ClusterObject
 from Fuzzy_clustering.version2.probabilistic_manager.proba_model_manager import proba_model_manager
 
 
@@ -24,11 +26,20 @@ class ModelPredictManager(object):
             self.load()
         except:
             pass
+        if hasattr(self, 'is_trained'):
+            self.istrained = self.is_trained
         self.static_data = static_data
         self.thres_act = static_data['clustering']['thres_act']
         self.rated = static_data['rated']
-        self.sc = joblib.load(os.path.join(self.static_data['path_data'], 'X_scaler.pickle'))
-        self.scale_y = joblib.load(os.path.join(self.static_data['path_data'], 'Y_scaler.pickle'))
+        file_x_scaler = os.path.join(self.static_data['path_data'], 'X_scaler.pickle')
+        file_y_scaler = os.path.join(self.static_data['path_data'], 'Y_scaler.pickle')
+        if os.path.exists(file_x_scaler) and os.path.exists(file_y_scaler):
+            self.sc = joblib.load(file_x_scaler)
+            self.scale_y = joblib.load(file_y_scaler)
+        elif hasattr(self, 'sc') and hasattr(self, 'scale_y'):
+            pass
+        else:
+            raise RuntimeError('Cannot find the data scalers')
         self.create_logger()
 
     def load_data_test(self):
@@ -91,6 +102,31 @@ class ModelPredictManager(object):
 
         # add the handlers to the logger
         self.logger.addHandler(handler)
+    def copytree(self, src, dst, symlinks=False, ignore=None):
+        for item in os.listdir(src):
+            s = os.path.join(src, item)
+            d = os.path.join(dst, item)
+            if os.path.isdir(s):
+                shutil.copytree(s, d, symlinks, ignore)
+            else:
+                shutil.copy2(s, d)
+    def check_if_is_global(self):
+        clust = 'global'
+        path_old = os.path.join(self.static_data['path_model'], 'Global_regressor')
+        path_new = os.path.join(self.static_data['path_model'], 'Regressor_layer/' + clust)
+        if os.path.exists(path_old):
+            if os.path.exists(path_new):
+                shutil.rmtree(path_new)
+            if not os.path.exists(path_new):
+                os.makedirs(path_new)
+
+            self.copytree(path_old, path_new)
+            shutil.move(os.path.join(path_new, 'Global_models.pickle'), os.path.join(path_new, 'model_global.pickle'))
+            shutil.rmtree(path_old)
+
+        if os.path.exists(path_new):
+            self.static_data['is_Global'] = True
+
 
     def predict_clusters(self, X_test, X_cnn_test, X_lstm_test, y_test=None, njobs=1):
         def predict_parallel(clust, cluster, static_data, X_test, act_test,
@@ -102,7 +138,7 @@ class ModelPredictManager(object):
                 pred_cluster = predict_module.predict(X_test.values, X_cnn=X_cnn_test,
                                                       X_lstm=X_lstm_test)
                 if y_test is not None:
-                    pred_cluster['metrics'] = predict_module.evaluate(pred_cluster['global'],
+                    pred_cluster['metrics'] = predict_module.evaluate(pred_cluster,
                                                                       y_test.values)
                 pred_cluster['dates'] = X_test.index
                 pred_cluster['index'] = np.arange(0, X_test.shape[0])
@@ -138,27 +174,35 @@ class ModelPredictManager(object):
         X_test = pd.DataFrame(self.sc.transform(X_test.values), columns=X_test.columns, index=X_test.index)
         if not y_test is None:
             y_test = pd.DataFrame(self.scale_y.transform(y_test.values), columns=y_test.columns, index=y_test.index)
-        if not hasattr(self, 'clusterer'):
-            self.clusterer = clusterer(self.static_data['path_fuzzy_models'])
-        act_test = self.clusterer.compute_activations(X_test)
-        act_test = self.check_if_all_nans(act_test)
+        if self.static_data['clustering']['is_Fuzzy']:
+            if not hasattr(self, 'clusterer'):
+                self.clusterer = Clusterer(self.static_data)
+            act_test = self.clusterer.compute_activations(X_test)
+            act_test = self.check_if_all_nans(act_test)
+        else:
+            act_test = pd.DataFrame(index=X_test.index)
+        # self.check_if_is_global()
         self.clusters = {}
         if self.static_data['is_Global']:
-            cluster = cluster_object(self.static_data, 'global')
+            cluster = ClusterObject(self.static_data, 'global')
             self.clusters['global'] = cluster
+            if 'global' not in act_test.columns:
+                act_test['global'] = 1
         if self.static_data['clustering']['is_Fuzzy']:
             for cluster_name in act_test.columns:
-                cluster = cluster_object(self.static_data, cluster_name)
+                cluster = ClusterObject(self.static_data, cluster_name)
                 self.clusters[cluster_name] = cluster
-        pred_clusters = Parallel(n_jobs=njobs)(
-            delayed(predict_parallel)(clust, cluster, self.static_data, X_test, act_test[clust],
-                                      X_cnn_test, X_lstm_test,
-                                      y_test=y_test) for clust, cluster in self.clusters.items())
-        # pred_clusters=[]
-        # for clust, cluster in self.clusters.items():
-        #     pred_clusters.append(predict_parallel(clust, cluster, self.static_data, X_test, act_test[clust],
-        #                               X_cnn_test, X_lstm_test,
-        #                               y_test=y_test))
+        if njobs > 1:
+            pred_clusters = Parallel(n_jobs=njobs)(
+                delayed(predict_parallel)(clust, cluster, self.static_data, X_test, act_test[clust],
+                                          X_cnn_test, X_lstm_test,
+                                          y_test=y_test) for clust, cluster in self.clusters.items())
+        else:
+            pred_clusters=[]
+            for clust, cluster in self.clusters.items():
+                pred_clusters.append(predict_parallel(clust, cluster, self.static_data, X_test, act_test[clust],
+                                          X_cnn_test, X_lstm_test,
+                                          y_test=y_test))
         for pred_clust in pred_clusters:
             pred_cluster[pred_clust[0]] = pred_clust[1]
         predictions = dict()
@@ -218,8 +262,9 @@ class ModelPredictManager(object):
             indices = X.index
             if self.static_data['type'] == 'pv' and self.static_data['NWP_model'] == 'skiron':
                 index = np.where(X['flux'] > 1e-8)[0]
-                X = X.iloc[index]
                 X_cnn = X_cnn[index]
+                index = X.index[index]
+                X = X.loc[index]
             else:
                 index = indices
 
@@ -232,25 +277,28 @@ class ModelPredictManager(object):
                 predictions_final[method] = pred_temp
 
             if self.static_data['is_probabilistic']:
-                proba_model = proba_model_manager(self.static_data)
-                if not proba_model.istrained:
-                    from sklearn.model_selection import train_test_split
-                    scale_y = joblib.load(os.path.join(self.static_data['path_data'], 'Y_scaler.pickle'))
-                    X_pred = np.array([])
-                    for method, pred in predictions_final.items():
-                        if X_pred.shape[0] == 0:
-                            X_pred = scale_y.transform(predictions_final[method].reshape(-1, 1))
-                        else:
-                            X_pred = np.hstack((X_pred, scale_y.transform(predictions_final[method].reshape(-1, 1))))
-                    X_pred[np.where(X_pred < 0)] = 0
+                if not os.path.exists(os.path.join(self.static_data['path_data'], 'cvs_proba.pickle')):
+                    proba_model = proba_model_manager(self.static_data)
+                    if not proba_model.istrained:
+                        from sklearn.model_selection import train_test_split
+                        scale_y = joblib.load(os.path.join(self.static_data['path_data'], 'Y_scaler.pickle'))
+                        X_pred = np.array([])
+                        for method, pred in predictions_final.items():
+                            if X_pred.shape[0] == 0:
+                                X_pred = scale_y.transform(predictions_final[method].values.reshape(-1, 1))
+                            else:
+                                X_pred = np.hstack((X_pred, scale_y.transform(predictions_final[method].values.reshape(-1, 1))))
+                        X_pred[np.where(X_pred < 0)] = 0
+                        ind_nan = np.where(np.all(~np.isnan(X_pred), axis=1))
+                        X_pred = X_pred[ind_nan]
+                        y = scale_y.transform(y.values[ind_nan].reshape(-1, 1))
+                        cvs = []
+                        for _ in range(3):
+                            X_train1, X_test1, y_train1, y_test1 = train_test_split(X_pred, y, test_size=0.15)
+                            X_train, X_val, y_train, y_val = train_test_split(X_train1, y_train1, test_size=0.15)
+                            cvs.append([X_train, y_train, X_val, y_val, X_test1, y_test1])
 
-                    cvs = []
-                    for _ in range(3):
-                        X_train1, X_test1, y_train1, y_test1 = train_test_split(X_pred, y, test_size=0.15)
-                        X_train, X_val, y_train, y_val = train_test_split(X_train1, y_train1, test_size=0.15)
-                        cvs.append([X_train, y_train, X_val, y_val, X_test1, y_test1])
-
-                    joblib.dump(X_pred, os.path.join(self.static_data['path_data'], 'cvs_proba.pickle'))
+                        joblib.dump(cvs, os.path.join(self.static_data['path_data'], 'cvs_proba.pickle'))
 
             return predictions_final
         else:
@@ -269,9 +317,9 @@ class ModelPredictManager(object):
         if self.istrained:
             indices = X.index
             if self.static_data['type'] == 'pv' and self.static_data['NWP_model'] == 'skiron':
-                index = np.where(X['flux'] > 1e-8)[0]
-                X = X.iloc[index]
-                X_cnn = X_cnn[index]
+                index = X.index[np.where(X['flux'] > 1e-8)[0]]
+                X = X.loc[index]
+                X_cnn = X_cnn[np.where(X['flux'] > 1e-8)[0]]
             else:
                 index = indices
 
@@ -314,6 +362,36 @@ class ModelPredictManager(object):
             return predictions_final
         else:
             raise ModuleNotFoundError('Model %s is not trained', self.static_data['_id'])
+    def evaluate_short_term(self, best_method):
+        data_path = self.static_data['path_data']
+        if self.istrained:
+            X, X_cnn, X_lstm, y = self.load_data_test()
+            X=X.fillna(method='bfill')
+            y=y.fillna(method='bfill')
+            X_cnn =np.nan_to_num(X_cnn,0)
+            X_lstm =np.nan_to_num(X_lstm,0)
+
+            y_test = y.copy()
+            indices = X.index
+            if self.static_data['type'] == 'pv' and self.static_data['NWP_model'] == 'skiron':
+                index = np.where(X['flux'] > 1e-8)[0]
+                X = X.iloc[index]
+                y = y.iloc[index]
+                X_cnn = X_cnn[index]
+                index = indices[index]
+            else:
+                index = indices
+
+            pred_cluster, predictions = self.predict_clusters(X, X_cnn, X_lstm, y)
+            predictions_final_temp = self.predict_model(pred_cluster, predictions)
+
+            predictions_final = dict()
+            for method, pred in predictions_final_temp.items():
+                pred_temp = pd.DataFrame(0, index=indices, columns=[method])
+                pred_temp.loc[index, method] = pred
+                predictions_final[method] = pred_temp
+
+        return predictions_final[best_method], y_test
 
     def evaluate_all(self):
         data_path = self.static_data['path_data']

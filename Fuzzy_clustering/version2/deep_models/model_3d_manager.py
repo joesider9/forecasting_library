@@ -6,12 +6,13 @@ import numpy as np
 from Fuzzy_clustering.version2.deep_models.cnn_tf_core import CNN
 from Fuzzy_clustering.version2.deep_models.cnn_tf_core_3d import CNN_3d
 from Fuzzy_clustering.version2.deep_models.lstm_tf_core_3d import LSTM_3d
-from Fuzzy_clustering.version2.deep_models.rbfnn_tf_core import RBFNN
 from Fuzzy_clustering.version2.deep_models.mlp_tf_core import MLP
-from Fuzzy_clustering.version2.model_manager.rbf_cnn_model import RBF_CNN_model
+from Fuzzy_clustering.version2.deep_models.rbfnn_tf_core import RbfNN
+from Fuzzy_clustering.version2.model_manager.rbf_cnn_model import RbfCnnModel
 
 
-class model3d_manager():
+
+class Model3dManager:
     def __init__(self, static_data, cluster, method, params):
         self.params = params
         self.test = params['test']
@@ -81,31 +82,22 @@ class model3d_manager():
             return self.acc
 
     def load_data(self):
+        cvs = np.array([])
         if self.method == 'cnn':
             if os.path.exists(os.path.join(self.data_dir, 'dataset_cnn.pickle')):
                 cvs = joblib.load(os.path.join(self.data_dir, 'cvs_cnn.pickle'))
-            else:
-                cvs = np.array([])
         elif self.method == 'lstm':
             if os.path.exists(os.path.join(self.data_dir, 'dataset_lstm.pickle')):
                 cvs = joblib.load(os.path.join(self.data_dir, 'cvs_lstm.pickle'))
-            else:
-                cvs = np.array([])
         elif self.method == 'rbfnn':
             if os.path.exists(os.path.join(self.data_dir, 'dataset_X.csv')):
                 cvs = joblib.load(os.path.join(self.data_dir, 'cvs.pickle'))
-            else:
-                cvs = np.array([])
         elif self.method == 'rbf-cnn':
             if os.path.exists(os.path.join(self.data_dir, 'dataset_X.csv')):
                 cvs = joblib.load(os.path.join(self.data_dir, 'cvs.pickle'))
-            else:
-                cvs = np.array([])
         elif self.method == 'mlp_3d':
             if os.path.exists(os.path.join(self.data_dir, 'dataset_X.csv')):
                 cvs = joblib.load(os.path.join(self.data_dir, 'cvs.pickle'))
-            else:
-                cvs = np.array([])
         return cvs
 
     def optimize_rbf(self):
@@ -125,7 +117,7 @@ class model3d_manager():
         y_val = cvs[0][3].reshape(-1, 1)
         X_test = cvs[0][4]
         y_test = cvs[0][5].reshape(-1, 1)
-        rbf = RBFNN(self.static_data, max_iterations=max_iterations)
+        rbf = RbfNN(self.static_data, max_iterations=max_iterations)
         self.acc, self.centroids, self.radius, self.w, self.model = rbf.train(X_train, y_train, X_val, y_val, X_test,
                                                                               y_test, self.num_centr, self.lr,
                                                                               gpu_id=self.gpu)
@@ -135,8 +127,8 @@ class model3d_manager():
         return self.acc
 
     def load_rbf_models(self):
-        model_rbfs = RBF_CNN_model(self.static_data, self.cluster, cnn=False)
-        rbf_models = [model_rbfs.model_rbf_ols.models, model_rbfs.model_rbf_ga.models, model_rbfs.model_rbfnn.model]
+        model_rbfs = RbfCnnModel(self.static_data, self.cluster, cnn=False)
+        rbf_models = [model_rbfs.model_rbf_ols.models, model_rbfs.model_rbf_ga.models, model_rbfs.model_rbf_nn.model]
         return rbf_models
 
     def optimize_rbf_cnn(self):
@@ -248,7 +240,17 @@ class model3d_manager():
         lstm_max_iterations = self.static_data['LSTM']['max_iterations']
         self.hold_prob = self.static_data['LSTM']['hold_prob']
         cvs = self.load_data()
-        mlp = MLP(self.static_data, self.rated, cvs[0], cvs[1], cvs[2], cvs[3], cvs[4], cvs[5], trial=self.trial,
+        self.N = cvs[0][0].shape[1]
+        self.D = cvs[0][0].shape[0] + cvs[0][2].shape[0] + cvs[0][4].shape[0]
+
+        X_train = cvs[0][0]
+        y_train = cvs[0][1].reshape(-1, 1)
+        X_val = cvs[0][2]
+        y_val = cvs[0][3].reshape(-1, 1)
+        X_test = cvs[0][4]
+        y_test = cvs[0][5].reshape(-1, 1)
+
+        mlp = MLP(self.static_data, self.rated, X_train, y_train, X_val, y_val, X_test, y_test, trial=self.trial,
                   probabilistc=self.probabilistic)
         # try:
         self.acc, self.model = mlp.train(max_iterations=lstm_max_iterations,
@@ -302,7 +304,7 @@ class model3d_manager():
         y_val = cvs[0][3].reshape(-1, 1)
         X_test = cvs[0][4]
         y_test = cvs[0][5].reshape(-1, 1)
-        rbf = RBFNN(self.static_data, max_iterations=max_iterations)
+        rbf = RbfNN(self.static_data, max_iterations=max_iterations)
         self.acc, self.centroids, self.radius, self.w, self.model = rbf.train(X_train, y_train, X_val, y_val, X_test,
                                                                               y_test, self.num_centr, self.lr,
                                                                               gpu_id=self.gpu)

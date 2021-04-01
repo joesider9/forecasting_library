@@ -1,10 +1,11 @@
 import glob
-import joblib
 import multiprocessing as mp
 import os
 import shutil
 import time
+import gc
 
+import joblib
 import numpy as np
 import pandas as pd
 from joblib import Parallel
@@ -12,60 +13,64 @@ from joblib import delayed
 
 from Fuzzy_clustering.version2.combine_clusters_manager.combine_cluster_manager import ClusterCombiner
 from Fuzzy_clustering.version2.combine_model_manager.combine_model_manager import CombineModelManager
-from Fuzzy_clustering.version2.deep_models.model_3d_manager import model3d_manager
+from Fuzzy_clustering.version2.deep_models.model_3d_manager import Model3dManager
 from Fuzzy_clustering.version2.feature_selection_manager.fs_manager import FeatSelManager
 from Fuzzy_clustering.version2.fuzzy_clustering_manager.train_fuzzy_manager import FuzzyManager
 from Fuzzy_clustering.version2.probabilistic_manager.proba_model_manager import proba_model_manager
 from Fuzzy_clustering.version2.project_manager.create_tasks import TaskCreator
-from Fuzzy_clustering.version2.rbf_ols_manager.rbf_ols_manager import RBFOLS_Manager
+from Fuzzy_clustering.version2.rbf_ols_manager.rbf_ols_manager import RbfOlsManager
 from Fuzzy_clustering.version2.sklearn_models.sklearn_manager import SKLearn_Manager
 
 
 def fuzzy_thread(static_data):
     fuzzy_model = FuzzyManager(static_data)
-    if fuzzy_model.istrained == False:
+    if fuzzy_model.istrained:
+        return 'Done', static_data['_id']
+    else:
         return fuzzy_model.train_fuzzy_clustering(), static_data['_id']
-    else:
-        return ('Done', static_data['_id'])
 
 
-def FS_thread(project_id, cluster):
+def fs_thread(project_id, cluster):
     FS_model = FeatSelManager(cluster)
-    if FS_model.istrained == False:
+    if FS_model.istrained:
+        return 'Done', cluster.cluster_name, project_id
+    else:
         return FS_model.fit(), cluster.cluster_name, project_id
-    else:
-        return 'Done', cluster.cluster_name, project_id
 
 
-def FS_check(project_id, cluster):
-    FS_model = FeatSelManager(cluster)
-    if FS_model.istrained == False:
+def fs_check(project_id, cluster):
+    fs_model = FeatSelManager(cluster)
+    if fs_model.istrained == False:
         return 'Untrained', cluster.cluster_name, project_id
     else:
         return 'Done', cluster.cluster_name, project_id
 
 
-def RBF_check(project_id, static_data, cluster):
-    rbf_model = RBFOLS_Manager(static_data, cluster)
-    if rbf_model.istrained == False:
+def rbf_check(project_id, static_data, cluster):
+    rbf_model = RbfOlsManager(static_data, cluster)
+    if not rbf_model.istrained:
         return 'Untrained', cluster.cluster_name, project_id
     else:
         return 'Done', cluster.cluster_name, project_id
 
 
-def Model3dThread(project_id, static_data, cluster, method, params):
-    model = model3d_manager(static_data, cluster, method, params)
-    if model.istrained == False:
-        acc = model.fit()
-    else:
+def model_3d_thread(project_id, static_data, cluster, method, params):
+    model = Model3dManager(static_data, cluster, method, params)
+
+    if model.istrained:
         acc = model.acc
-
+        print('Model of ' + cluster.cluster_name + ' of '+ project_id + ' test ' + str(params['test']) + ' trained')
+    else:
+        model.fit()
+        acc = model.acc
+    del model
+    gc.collect()
     return acc, cluster.cluster_name, project_id, params['test'], method
 
 
-def RBFOLS_thread(project_id, static_data, cluster):
-    rbf_model = RBFOLS_Manager(static_data, cluster)
-    if rbf_model.istrained == False:
+def rbf_ols_thread(project_id, static_data, cluster):
+    rbf_model = RbfOlsManager(static_data, cluster)
+    if not rbf_model.istrained:
         return rbf_model.fit(), cluster.cluster_name, project_id
     else:
         return 'Done', cluster.cluster_name, project_id
@@ -80,16 +85,16 @@ def GPU_thread(tasks, njobs):
     # pool.close()
     # pool.terminate()
     # pool.join()
-    results = Parallel(n_jobs=njobs)(delayed(Model3dThread)(task['project'], task['static_data'],
-                                                            task['cluster'], task['method'], task['params']) for
+    results = Parallel(n_jobs=njobs)(delayed(model_3d_thread)(task['project'], task['static_data'],
+                                                              task['cluster'], task['method'], task['params']) for
                                      task in tasks)
     return results
 
 
 def GPU_thread_parallel(tasks, njobs):
     pool = mp.Pool(processes=njobs)
-    result = [pool.apply_async(Model3dThread, args=(task['project'], task['static_data'],
-                                                    task['cluster'], task['method'], task['params'])) for
+    result = [pool.apply_async(model_3d_thread, args=(task['project'], task['static_data'],
+                                                      task['cluster'], task['method'], task['params'])) for
               task in tasks]
     results = [p.get() for p in result]
     pool.close()
@@ -202,8 +207,9 @@ def Combine_all_thread(project):
 def train_stage_combine(tasks_comb):
     results = []
     for task in tasks_comb:
-        res = Combine_thread(task['project'], task['static_data'], task['cluster'])
-        results.append(res)
+        if task != 'ready':
+            res = Combine_thread(task['project'], task['static_data'], task['cluster'])
+            results.append(res)
     return results
 
 
@@ -270,7 +276,7 @@ def train_on_cpus(projects, static_data, methods, path_group):
                 print(cluster_name)
                 cluster.static_data['sklearn']['njobs'] = njobs
                 project.static_data['sklearn']['njobs'] = njobs
-                result_rbfols.append(RBFOLS_thread(project.static_data['_id'], project.static_data, cluster))
+                result_rbfols.append(rbf_ols_thread(project.static_data['_id'], project.static_data, cluster))
     if len(result_rbfols) > 0:
         for res in result_rbfols:
             if res[0] not in {'Done'}:
@@ -299,9 +305,10 @@ def train_on_cpus(projects, static_data, methods, path_group):
         tasks_sk = TasksCreator.create_tasks_stage_for_sklearn(projects, sklearn_methods)
         if len(tasks_sk) > 0:
             for task in tasks_sk:
-                result_sklearn.append(
-                    SKlearn_thread(task['project'], task['static_data'], task['cluster'], task['method'],
-                                   task['optimize_method']))
+                if task != 'ready':
+                    result_sklearn.append(
+                        SKlearn_thread(task['project'], task['static_data'], task['cluster'], task['method'],
+                                       task['optimize_method']))
         else:
             raise RuntimeError('Cannot create tasks for SKlearn models')
     if len(result_sklearn) > 0:
@@ -325,7 +332,7 @@ def train_on_gpus(projects, static_data, methods, path_group):
         else:
             njobs = static_data['CNN']['njobs_3d']
 
-        gpu_status = int(ngpus * njobs)
+        gpu_status = 2 * int(ngpus * njobs)
         joblib.dump(gpu_status, os.path.join(path_group, 'gpu_status.pickle'))
         while True:
             try:
@@ -340,44 +347,45 @@ def train_on_gpus(projects, static_data, methods, path_group):
             cpu_status = joblib.load(os.path.join(path_group, 'cpu_status.pickle'))
 
         print('3d models cnn or lstm 1st stage starts')
-        tasks_3d_stage1 = TasksCreator.create_tasks_3d_stage1(projects)
-        if len(tasks_3d_stage1) > 0:
-            print(cpu_status)
-            print(gpu_status)
-            result_3d = train_3d(tasks_3d_stage1, njobs)
-            if len(result_3d) > 0:
-                print('3d models cnn or lstm 2nd stage starts')
-                result_3d_pd = pd.DataFrame(result_3d,
-                                            columns=['acc', 'cluster', 'project', 'test', 'method'])
-                result_3d_pd = result_3d_pd.iloc[
-                    result_3d_pd.groupby(by=['method', 'project', 'cluster']).agg({'acc': 'idxmin'}).values.ravel()]
-
-                tasks_3d_stage2 = TasksCreator.create_tasks_3d_stage2(result_3d_pd, tasks_3d_stage1)
-                tasks_3d_stage1 += tasks_3d_stage2
-
-                cpu_status = joblib.load(os.path.join(path_group, 'cpu_status.pickle'))
-                while (cpu_status + gpu_status) > ncpus:
-                    time.sleep(30)
-                    cpu_status = joblib.load(os.path.join(path_group, 'cpu_status.pickle'))
+        for project in projects:
+            tasks_3d_stage1 = TasksCreator.create_tasks_3d_stage1([project])
+            if len(tasks_3d_stage1) > 0:
                 print(cpu_status)
                 print(gpu_status)
-                if len(tasks_3d_stage2) > 0:
-                    result_3d += train_3d(tasks_3d_stage2, njobs)
-                else:
-                    raise RuntimeError('1st stage 3d Models cnn or lstm failed')
-                result_3d_2nd_pd = pd.DataFrame(result_3d,
+                result_3d = train_3d(tasks_3d_stage1, njobs)
+                if len(result_3d) > 0:
+                    print('3d models cnn or lstm 2nd stage starts')
+                    result_3d_pd = pd.DataFrame(result_3d,
                                                 columns=['acc', 'cluster', 'project', 'test', 'method'])
-                result_3d_2nd_pd.to_csv(os.path.join(path_group, 'results_3d_models_all.csv'))
-                result_3d_2nd_pd = result_3d_2nd_pd.iloc[
-                    result_3d_2nd_pd.groupby(by=['method', 'project', 'cluster']).agg(
-                        {'acc': 'idxmin'}).values.ravel()]
-                result_3d_2nd_pd.to_csv(os.path.join(path_group, 'results_3d_models_best.csv'))
+                    result_3d_pd = result_3d_pd.iloc[
+                        result_3d_pd.groupby(by=['method', 'project', 'cluster']).agg({'acc': 'idxmin'}).values.ravel()]
 
-                if 'CNN' in result_3d_2nd_pd['method'].to_list():
-                    save_deep_models('CNN', result_3d_2nd_pd, projects)
-                if 'LSTM' in result_3d_2nd_pd['method'].to_list():
-                    save_deep_models('LSTM', result_3d_2nd_pd, projects)
-                print('Training of Models 3d ends succesfully')
+                    tasks_3d_stage2 = TasksCreator.create_tasks_3d_stage2(result_3d_pd, tasks_3d_stage1)
+                    tasks_3d_stage1 += tasks_3d_stage2
+
+                    cpu_status = joblib.load(os.path.join(path_group, 'cpu_status.pickle'))
+                    while (cpu_status + gpu_status) > ncpus:
+                        time.sleep(30)
+                        cpu_status = joblib.load(os.path.join(path_group, 'cpu_status.pickle'))
+                    print(cpu_status)
+                    print(gpu_status)
+                    if len(tasks_3d_stage2) > 0:
+                        result_3d += train_3d(tasks_3d_stage2, njobs)
+                    else:
+                        raise RuntimeError('1st stage 3d Models cnn or lstm failed')
+                    result_3d_2nd_pd = pd.DataFrame(result_3d,
+                                                    columns=['acc', 'cluster', 'project', 'test', 'method'])
+                    result_3d_2nd_pd.to_csv(os.path.join(path_group, 'results_3d_models_all.csv'))
+                    result_3d_2nd_pd = result_3d_2nd_pd.iloc[
+                        result_3d_2nd_pd.groupby(by=['method', 'project', 'cluster']).agg(
+                            {'acc': 'idxmin'}).values.ravel()]
+                    result_3d_2nd_pd.to_csv(os.path.join(path_group, 'results_3d_models_best.csv'))
+
+                    if 'CNN' in result_3d_2nd_pd['method'].to_list():
+                        save_deep_models('CNN', result_3d_2nd_pd, [project])
+                    if 'LSTM' in result_3d_2nd_pd['method'].to_list():
+                        save_deep_models('LSTM', result_3d_2nd_pd, [project])
+                    print('Training of Models 3d ends succesfully')
     gpu_status = 0
     joblib.dump(gpu_status, os.path.join(path_group, 'gpu_status.pickle'))
     while True:
@@ -386,7 +394,7 @@ def train_on_gpus(projects, static_data, methods, path_group):
         for project in projects:
             for cluster_name, cluster in project.clusters.items():
                 if not static_data['sklearn']['fs_method'] == '':
-                    results_fs.append(FS_check(project.static_data['_id'], cluster))
+                    results_fs.append(fs_check(project.static_data['_id'], cluster))
         for res in results_fs:
 
             if res[0] not in {'Done'}:
@@ -467,7 +475,7 @@ def train_on_gpus(projects, static_data, methods, path_group):
             results_rbf = []
             for project in projects:
                 for cluster_name, cluster in project.clusters.items():
-                    results_rbf.append(RBF_check(project.static_data['_id'], project.static_data, cluster))
+                    results_rbf.append(rbf_check(project.static_data['_id'], project.static_data, cluster))
             for res in results_rbf:
 
                 if res[0] not in {'Done'}:
@@ -533,7 +541,7 @@ def train_on_gpus(projects, static_data, methods, path_group):
     if ('MLP_3D' in methods):
         print('Training MLP_3D 1st stage starts')
         njobs = static_data['MLP']['njobs']
-        gpu_status = 4 * ngpus * njobs
+        gpu_status = 2 * ngpus * njobs
         joblib.dump(gpu_status, os.path.join(path_group, 'gpu_status.pickle'))
         cpu_status = joblib.load(os.path.join(path_group, 'cpu_status.pickle'))
         while (cpu_status + gpu_status) > ncpus:
@@ -553,7 +561,7 @@ def train_on_gpus(projects, static_data, methods, path_group):
                     {'acc': 'idxmin'}).values.ravel()]
             result_mlp_3d_pd.to_csv(os.path.join(path_group, 'results_MLP_models_best.csv'))
 
-            save_deep_models('MLP', result_mlp_3d_pd, projects)
+            save_deep_models('MLP_3D', result_mlp_3d_pd, projects)
             print('Training MLP_3D ends succesfully')
 
     gpu_status = 0
@@ -571,7 +579,7 @@ def save_deep_models(method, results, projects):
             test = results['test'].iloc[np.where((method == results['method']).any() and (
                     project.static_data['_id'] == results['project']).any()
                                                  and (cluster_name == results['cluster']).any())[0]].values[0]
-            model = model3d_manager(project.static_data, cluster, method, {'test': test})
+            model = Model3dManager(project.static_data, cluster, method, {'test': test})
             for filename in glob.glob(os.path.join(model.test_dir, '*.*')):
                 print(filename)
                 shutil.copy(filename, model.model_dir)

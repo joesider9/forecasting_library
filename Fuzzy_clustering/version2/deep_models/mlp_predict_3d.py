@@ -2,18 +2,19 @@ import numpy as np
 import tensorflow as tf
 
 
-class MLP_predict():
-    def __init__(self, static_data, trial=0, probabilistc=False):
+class MLPPredict:
+    def __init__(self, static_data, model, trial=0, probabilistc=False):
         self.static_data = static_data
         self.probabilistic = probabilistc
         self.trial = trial
+        self.model = model
 
-    def init_weights(self, shape):
-        init_random_dist = tf.random.truncated_normal(shape, stddev=0.001)
+    def init_weights(self, init_w):
+        init_random_dist = tf.convert_to_tensor(init_w)
         return tf.Variable(init_random_dist)
 
-    def init_bias(self, shape):
-        init_bias_vals = tf.constant(0.001, shape=shape)
+    def init_bias(self, init_b):
+        init_bias_vals = tf.convert_to_tensor(init_b)
         return tf.Variable(init_bias_vals)
 
     def normal_full_layer(self, input_layer, init_w, init_b):
@@ -42,7 +43,6 @@ class MLP_predict():
                     name='dense1',
                     activation=act_func)
                 full_out_dropout = tf.nn.dropout(mlp_1(x1), rate=1 - hold_prob)
-
             elif self.trial == 1:
                 mlp_1 = tf.keras.layers.Dense(
                     units[0],
@@ -110,7 +110,7 @@ class MLP_predict():
 
     def predict(self, X):
         units = self.model['units']
-        act_func = self.model['act_func']
+        act_func = self.model['best_act_func']
         best_weights = self.model['best_weights']
 
         H = X
@@ -163,7 +163,7 @@ class MLP_predict():
                              best_weights['build_mlp/{}_q{}/bias:0'.format(i, int(q * 100))]])
                 else:
                     mlp_1.set_weights(
-                        [best_weights['build_mlp/dense1/kernel:0'], best_weights['build_mlp/dense1/recurrent_kernel:0'],
+                        [best_weights['build_mlp/dense1/kernel:0'],
                          best_weights['build_mlp/dense1/bias:0']])
 
             elif self.trial == 1:
@@ -195,11 +195,10 @@ class MLP_predict():
                             [best_weights['build_mlp/{}_q{}/kernel:0'.format(i, int(q * 100))],
                              best_weights['build_mlp/{}_q{}/bias:0'.format(i, int(q * 100))]])
                 else:
-                    mlp_1.set_weights([best_weights['build_mlp/mlp1/kernel:0'],
-                                       best_weights['build_mlp/mlp1/recurrent_kernel:0'],
-                                       best_weights['build_mlp/mlp1/bias:0']])
+                    mlp_1.set_weights([best_weights['build_mlp/dense1/kernel:0'],
+                                       best_weights['build_mlp/dense1/bias:0']])
                     full_layer_two.set_weights(
-                        [best_weights['build_mlp/dense1/kernel:0'], best_weights['build_mlp/dense1/bias:0']])
+                        [best_weights['build_mlp/dense2/kernel:0'], best_weights['build_mlp/dense2/bias:0']])
 
                     full_layer_three.set_weights([best_weights['build_mlp/dense3/kernel:0'],
                                                   best_weights['build_mlp/dense3/bias:0']])

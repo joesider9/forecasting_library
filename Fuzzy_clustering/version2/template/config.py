@@ -5,47 +5,65 @@ Docker = False
 if Docker:
     sys_folder = '/models/'
     nwp_folder = '/nwp_grib/'
-    data_file_name = './data/wind_ts.csv'
+    data_file_name = 'data/St_Miguel/wind/OneHour/DayAhead/wind_ts.csv'
 else:
     if sys.platform == 'linux':
         sys_folder = '/media/smartrue/HHD1/George/models/'
         nwp_folder = '/media/smartrue/HHD2/'
-        data_file_name = 'D:/Dropbox/current_codes/PycharmProjects/Petalas/data/wind_ts.csv'
+        data_file_name = '/home/smartrue/PycharmProjects/Azores/data/St_Miguel/wind/DayAhead/wind_ts.csv'
     else:
         sys_folder = 'D:/models/'
         nwp_folder = 'D:/Dropbox/'
-        data_file_name = 'D:/Dropbox/current_codes/PycharmProjects/Petalas/data/wind_ts.csv'
+        data_file_name = 'D:/Dropbox/current_codes/PycharmProjects/Azores/data/St_Miguel/wind/DayAhead/wind_ts.csv'
 
-project_owner = 'my_projects'
-projects_group = 'Greece'
-area_group = [[33.9426055, 18.929342], [42.047856, 30.0400288]]
-version_group = 1
-version_model = 1
+project_owner = 'EDA'
+projects_group = 'Azores'
+area_group = [[36.5, -33], [40.5, -23.5]]
+version_group = 0
+version_model = 0
+horizon = 'day_ahead'
+ts_resolution = 'hourly'
 
-njobs = 2  # ALL CPUS
-njobs_fuzzy = 2  # HAlf CPUs
-njobs_feat_sel = 2  # 3/4 CPUS
-inner_jobs_feat_sel= 1
-njobs_rbfols = 2
-njobs_rbfnn = 2
-njobs_sklearn = 2
-njobs_lstm = 2
-njobs_cnn_3d = 2
-njobs_cnn = 1
-njobs_mlp = 2
-intra_op = 2
+if sys.platform != 'linux':
+    njobs = 8  # ALL CPUS
+    njobs_fuzzy = 8  # HAlf CPUs
+    njobs_feat_sel = 8  # 3/4 CPUS
+    inner_jobs_feat_sel= 1
+    njobs_rbfols = 8
+    njobs_rbfnn = 4
+    njobs_sklearn = 8
+    njobs_lstm = 2
+    njobs_cnn_3d = 2
+    njobs_cnn = 1
+    njobs_mlp = 2
+    intra_op = 2
 
-ngpus = 1
+    ngpus = 1
+else:
+    njobs = 18  # ALL CPUS
+    njobs_fuzzy = 18  # HAlf CPUs
+    njobs_feat_sel = 18  # 3/4 CPUS
+    inner_jobs_feat_sel= 1
+    njobs_rbfols = 18
+    njobs_rbfnn = 3
+    njobs_sklearn = 18
+    njobs_lstm = 2
+    njobs_cnn_3d = 2
+    njobs_cnn = 1
+    njobs_mlp = 3
+    intra_op = 2
+
+    ngpus = 2
 
 
-Evaluation = None # date or None
+Evaluation = '01072019 00:00' # date or None
 
 RECREATE_NWP_FILES = False
 RECREATE_DATASETS = False
 weather_in_data = False
 
-NWP_model = 'ecmwf'  # Skiron, ECMWF
-NWP_resolution = 0.1  # 0.05 or 0.04
+NWP_model = 'gfs'  # Skiron, ECMWF, gfs
+NWP_resolution = 0.25  # 0.05 or 0.04, 0.25
 
 compress_data = 'dense'  # PCA or dense
 
@@ -73,7 +91,7 @@ project_methods['RBF_ALL'] = False
 project_methods['CNN'] = True
 project_methods['LSTM'] = False
 project_methods['MLP_3D'] = False
-project_methods['SVM'] = True
+project_methods['SVM'] = False
 project_methods['NUSVM'] = False
 project_methods['MLP'] = True
 project_methods['RF'] = True
@@ -123,25 +141,25 @@ elif model_type == 'wind':
 elif model_type == 'load':
     var_imp = [
         {'sp_index': [
-            {'hour': {'mfs': 6}, 'month': {'mfs': 4}},
+            {'hour': {'mfs': 8}, 'month': {'mfs': 5}},
+            {'hour': {'mfs': 3}, 'month': {'mfs': 2}},
             {'hour': {'mfs': 2}, 'month': {'mfs': 2}},
-            {'hour': {'mfs': 2}, 'month': {'mfs': 1}},
         ]
         },
-        {'sp_index': [
-            {'hour': {'mfs': 4}, 'month': {'mfs': 6}},
-            {'hour': {'mfs': 2}, 'month': {'mfs': 2}},
-            {'hour': {'mfs': 1}, 'month': {'mfs': 2}},
-        ]
-        },
-        {'sp_index': [
-            {'hour': {'mfs': 4}, 'Temp': {'mfs': 6}},
-            {'hour': {'mfs': 2}, 'Temp': {'mfs': 2}},
-            {'hour': {'mfs': 1}, 'Temp': {'mfs': 2}},
-        ]
-        }
+        # {'sp_index': [
+        #     {'hour': {'mfs': 5}, 'month': {'mfs': 8}},
+        #     {'hour': {'mfs': 2}, 'month': {'mfs': 3}},
+        #     {'hour': {'mfs': 2}, 'month': {'mfs': 2}},
+        # ]
+        # },
+        # {'sp_index': [
+        #     {'hour': {'mfs': 6}, 'Temp': {'mfs': 7}},
+        #     {'hour': {'mfs': 2}, 'Temp': {'mfs': 3}},
+        #     {'hour': {'mfs': 2}, 'Temp': {'mfs': 2}},
+        # ]
+        # }
     ]
-    var_lin = ['month', 'sp_index', 'dayweek', 'Temp'] + ['LoadForecast_' + str(k) for k in range(17, 25)]
+    var_lin = ['month', 'sp_index', 'dayweek', 'Temp'] + ['load_' + str(k) for k in range(0, 12)]
     var_nonreg = []
 elif model_type == 'fa':
     var_imp = [
@@ -185,10 +203,6 @@ n_clusters = 200
 thres_act = 0.01
 thres_split = 0.8
 
-clustering_train_online = False
-
-add_rules_indvidual = False
-import_external_rules = []  # horizon
 
 
 clustering_train_online=False

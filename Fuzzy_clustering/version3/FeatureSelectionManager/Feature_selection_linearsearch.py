@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import logging, os, joblib
-from sklearn.linear_model import ElasticNetCV
+from sklearn.linear_model import ElasticNetCV, LinearRegression
 from sklearn.decomposition import PCA
 import copy
 
@@ -87,7 +87,11 @@ class FS(object):
 
         self.N_tot = X_train.shape[1]
 
-        regressor = ElasticNetCV(cv=5, random_state=42, max_iter=100000)
+        if np.std(y_train.ravel())>1e-3:
+            regressor = ElasticNetCV(cv=5, random_state=42, max_iter=500000)
+        else:
+            regressor = LinearRegression()
+
         regressor.fit(X_train[:, 0].reshape(-1, 1), y_train.ravel())
         # regressor = sklearn_model(self.static_data, self.log_dir, 1, method, njobs, FS=True, path_group=self.path_group)
         # regressor.train(cvs)
@@ -114,7 +118,11 @@ class FS(object):
             joblib.dump(cpu_status, os.path.join(self.path_group, 'cpu_status.pickle'))
 
             features_temp = keep_features + [f]
-            regressor = ElasticNetCV(cv=5, random_state=42, max_iter=500000)
+            if np.std(y_train.ravel()) > 1e-3:
+                regressor = ElasticNetCV(cv=5, random_state=42, max_iter=500000)
+            else:
+                regressor = LinearRegression()
+
             regressor.fit(X_train[:, features_temp], y_train.ravel())
             pred = regressor.predict(X_test[:, features_temp]).reshape(-1, 1)
             acc_test_new = np.mean(np.abs(scale_y.inverse_transform(pred).ravel() - y_test.ravel()) /rated)
@@ -142,7 +150,10 @@ class FS(object):
                 joblib.dump(cpu_status, os.path.join(self.path_group, 'cpu_status.pickle'))
 
                 features_temp = keep_features + [f]
-                regressor = ElasticNetCV(cv=5, random_state=42, max_iter=500000)
+                if np.std(y_train.ravel()) > 1e-3:
+                    regressor = ElasticNetCV(cv=5, random_state=42, max_iter=500000)
+                else:
+                    regressor = LinearRegression()
                 regressor.fit(X_train[:, features_temp], y_train.ravel())
                 pred = regressor.predict(X_test[:, features_temp]).reshape(-1, 1)
                 acc_test_new = np.mean(np.abs(scale_y.inverse_transform(pred).ravel() - y_test.ravel()) /rated)
@@ -164,6 +175,8 @@ class FS(object):
             pca = self.reduce_dim(cvs_temp)
         else:
             pca = None
+        if self.features.shape[0] <= 1:
+            self.features = np.stack((self.features, remove_features[:2-self.features.shape[0]])).ravel()
         # logger.info('Number of variables %s', str(self.features.shape[0]))
         # logger.info('Finish the feature extraction ')
         return features, pca

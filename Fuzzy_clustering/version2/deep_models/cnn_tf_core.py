@@ -1,7 +1,7 @@
-import joblib
 import os
 import sys
 
+import joblib
 import numpy as np
 import tensorflow as tf
 from scipy.interpolate import interp2d
@@ -9,7 +9,7 @@ from sklearn.preprocessing import MinMaxScaler
 from tqdm import tqdm
 
 
-class CNN():
+class CNN:
     def __init__(self, static_data, rated, models, X_train, y_train, X_val, y_val, X_test, y_test, pool_size, trial=0):
         self.static_data = static_data
         self.trial = trial
@@ -72,10 +72,9 @@ class CNN():
                 Radius = self.rbf_models[i]['Radius']
             elif self.rbf_models[i]['Radius'].shape[0] == self.num_centr:
                 Radius = self.rbf_models[i]['Radius']
-            elif self.rbf_models[i]['Radius'].shape[0] < self.num_centr:
-                Radius = self.rescale(self.rbf_models[i]['Radius'], self.num_centr, self.D)
             else:
-                raise ValueError('Unkown shape')
+                Radius = self.rescale(self.rbf_models[i]['Radius'], self.num_centr, self.D)
+
             H_train.append(
                 np.nan_to_num(np.transpose(self.rbf_map(X_train, self.num_centr, centroids, Radius), [1, 2, 0])))
             H_val.append(np.nan_to_num(np.transpose(self.rbf_map(X_val, self.num_centr, centroids, Radius), [1, 2, 0])))

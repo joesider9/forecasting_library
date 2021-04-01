@@ -84,9 +84,8 @@ class CombineModelPredict(object):
         cluster_dir = os.path.join(pathname)
         if os.path.exists(os.path.join(cluster_dir, 'combine_models.pickle')):
             try:
-                f = open(os.path.join(cluster_dir, 'combine_models.pickle'), 'rb')
+                f = os.path.join(cluster_dir, 'combine_models.pickle')
                 tmp_dict = joblib.load(f)
-                f.close()
                 del tmp_dict['model_dir']
                 self.__dict__.update(tmp_dict)
             except:

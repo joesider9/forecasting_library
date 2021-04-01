@@ -1,10 +1,10 @@
-import logging, sys
-
+import logging
 from multiprocessing import Process
 
-from Fuzzy_clustering.version2.model_manager.data_manage_clusters import cluster_object
+from Fuzzy_clustering.version2.model_manager.data_manage_clusters import ClusterObject
 from Fuzzy_clustering.version2.model_manager.models_predict_manager import ModelPredictManager
 from Fuzzy_clustering.version2.model_manager.models_train_manager import ModelTrainManager
+from Fuzzy_clustering.version2.project_manager.create_tasks_tl import TaskCreator_TL
 from Fuzzy_clustering.version2.project_manager.create_threads import *
 from Fuzzy_clustering.version2.project_manager.create_threads_tl import *
 
@@ -28,18 +28,18 @@ class ProjectsTrainManager:
         self.path_group = self.static_data['path_group']
         self.path_nwp_group = self.static_data['path_nwp_group']
         self.methods = [method for method in static_data['project_methods'].keys() if
-                        static_data['project_methods'][method] == True]
+                        static_data['project_methods'][method]]
         self.group_static_data = joblib.load(os.path.join(self.path_group, 'static_data_projects.pickle'))
         self.create_logger()
 
     def fit(self):
 
         os.environ['CUDA_VISIBLE_DEVICES'] = ','.join([str(n) for n in range(self.static_data['ngpus'])])
-        projects, projects_TL = self.collect_projects()
+        projects, projects_tl = self.collect_projects()
 
-        ncpus = int(self.static_data['njobs'])
-        joblib.dump(ncpus, os.path.join(self.path_group, 'total_cpus.pickle'))
-        cpu_status = ncpus
+        n_cpus = int(self.static_data['njobs'])
+        joblib.dump(n_cpus, os.path.join(self.path_group, 'total_cpus.pickle'))
+        cpu_status = n_cpus
         joblib.dump(cpu_status, os.path.join(self.path_group, 'cpu_status.pickle'))
         gpu_status = 0
         joblib.dump(gpu_status, os.path.join(self.path_group, 'gpu_status.pickle'))
@@ -47,22 +47,27 @@ class ProjectsTrainManager:
         # Fuzzy clustering threads
         responses = []
         for project in projects:
-            self.logger.info('Train Fuzzy model of %s', project.static_data['_id'])
-            res = fuzzy_thread(project.static_data)
-            responses.append(res)
+            if project.static_data['clustering']['is_Fuzzy']:
+                self.logger.info('Train Fuzzy model of %s', project.static_data['_id'])
+                res = fuzzy_thread(project.static_data)
+                responses.append(res)
+            else:
+                res = ['Done', project.static_data['_id']]
+                responses.append(res)
 
         for res in responses:
             if res[0] not in {'Done'}:
                 raise RuntimeError('Fuzzy Clustering fails %s', res[1])
+
         # Transfer learning of fuzzy models
-        for project in projects_TL:
+        for project in projects_tl:
             From_model_path = project.static_data['tl_project']['static_data']['path_fuzzy_models']
             To_model_path = project.static_data['path_fuzzy_models']
 
             for filename in glob.glob(os.path.join(From_model_path, '*.*')):
                 shutil.copy(filename, To_model_path)
             fuzzy_model = FuzzyManager(project.static_data)
-            if fuzzy_model.istrained == True:
+            if fuzzy_model.istrained:
                 fuzzy_model.save()
             else:
                 raise RuntimeError('Check the transfer Fuzzy model for %s', project.static_data['_id'])
@@ -71,39 +76,44 @@ class ProjectsTrainManager:
         for project in projects:
             self.logger.info('Create clusters of %s', project.static_data['_id'])
             project.create_clusters_and_data()
-        for project in projects_TL:
+        for project in projects_tl:
             self.logger.info('Create clusters of %s', project.static_data['_id'])
             project.create_clusters_and_data()
 
-        results_fs = Parallel(n_jobs=ncpus)(delayed(FS_thread)(project.static_data['_id'], cluster)
-                                            for project in projects for cluster_name, cluster in
-                                            project.clusters.items())
-        # results_fs = []
-        # for project in projects:
-        #     for cluster_name, cluster in project.clusters.items():
-        #         if not self.static_data['sklearn']['fs_method'] == '':
-        #             results_fs.append(FS_thread(project.static_data['_id'], cluster))
+        if self.static_data['sklearn']['fs_method'] == 'linearsearch':
+            results_fs = Parallel(n_jobs=n_cpus)(delayed(fs_thread)(project.static_data['_id'], cluster)
+                                                 for project in projects for cluster_name, cluster in
+                                                 project.clusters.items())
+        else:
+            results_fs = []
+            for project in projects:
+                for cluster_name, cluster in project.clusters.items():
+                    results_fs.append(fs_thread(project.static_data['_id'], cluster))
+
         if len(results_fs) > 0:
             for res in results_fs:
                 if res[0] not in {'Done'}:
                     raise RuntimeError('Feature selection fails cluster %s of project %s', res[1], res[2])
         for project in projects:
             for cluster_name, cluster in project.clusters.items():
-                clust_obj = cluster_object(cluster.static_data, cluster_name)
+                clust_obj = ClusterObject(cluster.static_data, cluster_name)
                 clust_obj.istrained = False
                 clust_obj.save(cluster.cluster_dir)
                 cluster = clust_obj
             project.save()
-        procs = []
-        procs.append(Process(target=train_on_cpus, args=(projects, self.static_data, self.methods, self.path_group)))
-        procs.append(Process(target=train_on_gpus, args=(projects, self.static_data, self.methods, self.path_group)))
-        for p in procs:
-            p.daemon = False
-            p.start()
-        for p in procs:
-            p.join()
+        # procs = []
+        # procs.append(Process(target=train_on_cpus, args=(projects, self.static_data, self.methods, self.path_group)))
+        # procs.append(Process(target=train_on_gpus, args=(projects, self.static_data, self.methods, self.path_group)))
+        # for p in procs:
+        #     p.daemon = False
+        #     p.start()
+        # for p in procs:
+        #     p.join()
+        #
+        # self.train_combine_models(projects)
 
-        self.train_combine_models(projects)
+        if self.static_data['is_probabilistic']:
+            self.train_proba()
 
     def train_combine_models(self, projects):
 
@@ -118,7 +128,7 @@ class ProjectsTrainManager:
 
         for project in projects:
             for cluster_name, cluster in project.clusters.items():
-                clust_obj = cluster_object(cluster.static_data, cluster_name)
+                clust_obj = ClusterObject(cluster.static_data, cluster_name)
                 clust_obj.istrained = True
                 clust_obj.save(cluster.cluster_dir)
                 cluster.istrained = True
@@ -142,7 +152,8 @@ class ProjectsTrainManager:
         projects += projects_TL
         for project in projects:
             model_manager = ModelPredictManager(project.static_data)
-            predictions = model_manager.predict_offline()
+            if not os.path.exists(os.path.join(project.static_data['path_data'], 'cvs_proba.pickle')):
+                predictions = model_manager.predict_offline()
         njobs_mlp = self.static_data['MLP']['njobs']
         tasks_proba_stage1 = self.TasksCreator.create_tasks_proba_stage1(projects)
         if len(tasks_proba_stage1) > 0:
@@ -171,7 +182,7 @@ class ProjectsTrainManager:
                 test = results['test'].iloc[np.where((method == results['method']).any() and (
                         project.static_data['_id'] == results['project']).any()
                                                      and (cluster_name == results['cluster']).any())[0]].values[0]
-                model = model3d_manager(project.static_data, cluster, method, {'test': test})
+                model = Model3dManager(project.static_data, cluster, method, {'test': test})
                 for filename in glob.glob(os.path.join(model.test_dir, '*.*')):
                     shutil.copy(filename, model.model_dir)
 
@@ -189,42 +200,41 @@ class ProjectsTrainManager:
         self.logger.addHandler(handler)
 
     def collect_projects(self):
+
         projects = []
-        projects_TL = []
+        projects_tl = []
+
         for project in self.group_static_data:
-            if not 'path_group' in project['static_data'].keys():
+            project_path = project['static_data']['path_data']
+            if 'path_group' not in project['static_data'].keys():
                 project['static_data']['path_group'] = self.path_group
             if project['_id'] != project['static_data']['projects_group'] + '_' + project['static_data']['type']:
                 project_model = ModelTrainManager(project['static_data']['path_model'])
-                # if project_model.istrained == False:
                 project_model.init(project['static_data'], self.data_variables)
                 if self.model_type in {'wind', 'pv'}:
-                    if os.path.exists(os.path.join(project['static_data']['path_data'], 'dataset_X.csv')) \
-                            and os.path.exists(os.path.join(project['static_data']['path_data'], 'dataset_y.csv')) \
-                            and os.path.exists(os.path.join(project['static_data']['path_data'], 'dataset_cnn.pickle')):
-                        if project['static_data']['transfer_learning'] == False:
-                            projects.append(project_model)
+                    if os.path.exists(os.path.join(project_path, 'dataset_X.csv')) \
+                            and os.path.exists(os.path.join(project_path, 'dataset_y.csv')):
+                        if project['static_data']['transfer_learning']:
+                            projects_tl.append(project_model)
                         else:
-                            projects_TL.append(project_model)
+                            projects.append(project_model)
                     else:
                         raise ValueError('Cannot find project ', project['_id'], ' datasets')
 
                 elif self.model_type in {'load'}:
-                    if os.path.exists(os.path.join(project['static_data']['path_data'], 'dataset_X.csv')) \
-                            and os.path.exists(os.path.join(project['static_data']['path_data'], 'dataset_y.csv')) \
-                            and os.path.exists(
-                        os.path.join(project['static_data']['path_data'], 'dataset_lstm.pickle')):
+                    if os.path.exists(os.path.join(project_path, 'dataset_X.csv')) \
+                            and os.path.exists(os.path.join(project_path, 'dataset_y.csv')) \
+                            and os.path.exists(os.path.join(project_path, 'dataset_lstm.pickle')):
                         projects.append(project_model)
 
                 elif self.model_type in {'fa'}:
-                    if os.path.exists(os.path.join(project['static_data']['path_data'], 'dataset_X.csv')) \
-                            and os.path.exists(os.path.join(project['static_data']['path_data'], 'dataset_y.csv')) \
-                            and os.path.exists(
-                        os.path.join(project['static_data']['path_data'], 'dataset_lstm.pickle')):
+                    if os.path.exists(os.path.join(project_path, 'dataset_X.csv')) \
+                            and os.path.exists(os.path.join(project_path, 'dataset_y.csv')) \
+                            and os.path.exists(os.path.join(project_path, 'dataset_lstm.pickle')):
                         projects.append(project_model)
                 else:
                     raise ValueError('Cannot recognize model type')
-        return projects, projects_TL
+        return projects, projects_tl
 
     def clear_backup_projects(self):
 

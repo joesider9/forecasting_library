@@ -213,7 +213,7 @@ class rbf_ols():
 class rbf_ols_module(object):
     def __init__(self, static_data, cluster_dir, rated, njobs, GA=False, path_group=None):
         self.static_data = static_data
-        self.cluster = [p1 for p1 in cluster_dir.split('/') if ('rule' in p1) or ('global' in p1)][0]
+        self.cluster = [p1 for p1 in cluster_dir.split('/') if ('rule' in p1) or ('global' in p1)][0].split('\\')[0]
         self.path_group = path_group
         self.njobs = njobs
         self.rated = rated

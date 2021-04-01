@@ -52,10 +52,9 @@ class CNN_predict():
                 Radius = self.rbf_models[i]['Radius']
             elif self.rbf_models[i]['Radius'].shape[0] == self.num_centr:
                 Radius = self.rbf_models[i]['Radius']
-            elif self.rbf_models[i]['Radius'].shape[0] < self.num_centr:
-                Radius = self.rescale(self.rbf_models[i]['Radius'], self.num_centr, self.D)
             else:
-                raise ValueError('Unkown shape')
+                Radius = self.rescale(self.rbf_models[i]['Radius'], self.num_centr, self.D)
+
             H.append(np.transpose(self.rbf_map(X_train, self.num_centr, centroids, Radius), [1, 2, 0]))
             H[i] = np.array(H[i])
             H[i] = H[i].reshape(-1, self.D * self.num_centr)

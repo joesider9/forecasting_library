@@ -1,7 +1,8 @@
-import joblib
 import logging
-import numpy as np
 import os
+
+import joblib
+import numpy as np
 import pandas as pd
 from joblib import Parallel
 from joblib import delayed
@@ -247,8 +248,9 @@ class dataset_creator_scada():
     def sp_index(self, r):
         ### Is modified
         cal = Greece()
-        # {'New year','Epiphany','Clean Monday','Independence Day','Good Friday','Easter Saturday','Easter Sunday','Easter Monday','Labour Day','Pentecost','Whit Monday','Assumption of Mary to Heaven','Ohi Day','Christmas Eve'
-        # ,'Christmas Day','Glorifying Mother of God','Last day of year'}
+        # {'New year','Epiphany','Clean Monday','Independence Day','Good Friday','Easter Saturday','Easter Sunday',
+        # 'Easter Monday','Labour Day','Pentecost','Whit Monday','Assumption of Mary to Heaven','Ohi Day',
+        # 'Christmas Eve','Christmas Day','Glorifying Mother of God','Last day of year'}
         if cal.is_holiday(r):
             sp = 100
 

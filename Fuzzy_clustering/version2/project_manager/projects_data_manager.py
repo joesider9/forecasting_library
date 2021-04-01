@@ -19,7 +19,8 @@ def elapsed_timer():
 
 class ProjectsDataManager(object):
 
-    def __init__(self, static_data):
+    def __init__(self, static_data, is_test: bool):
+        self.is_test = is_test
         self.static_data = static_data
         self.projects = ProjectGroupInit(self.static_data)
         self.projects.initialize()
@@ -30,27 +31,24 @@ class ProjectsDataManager(object):
         if not hasattr(self, 'data_eval') and hasattr(self.projects, 'data_eval'):
             self.data_eval = self.projects.data_eval
         self.data_variables = self.projects.data_variables
+        # List of dicts. Each dict has information about a different project
         self.group_static_data = self.projects.group_static_data
 
-        self.logger = create_logger(logger_name=f'ProjectsDataManager_{self.model_type}',
-                                    abs_path=self.path_group, logger_path=f'log_{self.projects_group}.log',
-                                    write_type='a')
+        self.logger = create_logger(logger_name=f'ProjectsDataManager_{self.model_type}', write_type='a',
+                                    abs_path=self.path_group, logger_path=f'log_{self.projects_group}.log')
 
-    def nwp_extractor(self, test=False):
-        nwp_manager = NwpExtractor(self.static_data)
-        if not test:
-            response = nwp_manager.extract(self.data)
-        else:
-            response = nwp_manager.extract(self.data_eval)
-        return response
+    def nwp_extractor(self):
+        nwp_extractor = NwpExtractor(self.static_data)
+        return nwp_extractor.extract(self.data_eval) if self.is_test else nwp_extractor.extract(self.data)
 
-    def create_datasets(self, test=False):
-        data_manager = DatasetCreator(self.static_data, self.group_static_data)
-        if test:
-            response = data_manager.create_datasets(self.projects.data_eval, test=test)
-        else:
-            response = data_manager.create_datasets(self.data, test=test)
-        return response
+    def create_datasets(self):
+        dataset_creator = DatasetCreator(self.static_data, self.group_static_data, self.is_test)
+        data_input = self.projects.data_eval if self.is_test else self.data
+        return dataset_creator.create_datasets(data_input)
+
+    def create_short_term_datasets(self, data_input):
+        dataset_creator = DatasetCreator(self.static_data, self.group_static_data, None)
+        return dataset_creator.create_datasets(data_input)
 
     def create_projects_relations(self):
 
@@ -83,5 +81,3 @@ class ProjectsDataManager(object):
                     project['static_data']['transfer_learning'] = projects[project['_id']]['static_data'][
                         'transfer_learning']
                     project['static_data']['tl_project'] = projects[project['_id']]['static_data']['tl_project']
-
-

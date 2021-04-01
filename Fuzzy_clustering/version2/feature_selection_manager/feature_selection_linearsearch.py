@@ -81,8 +81,7 @@ class FS(object):
         rated = self.static_data['rated']
         if rated is None:
             rated = y_test
-        else:
-            rated = 1
+
         X_train = np.vstack((X_train, X_val))
         y_train = np.vstack((y_train, y_val))
 
@@ -97,43 +96,15 @@ class FS(object):
 
         pred = regressor.predict(X_test[:, 0].reshape(-1, 1)).reshape(-1, 1)
         acc_test = np.mean(np.abs(scale_y.inverse_transform(pred).ravel() - y_test) / rated)
+        if acc_test>0.00001:
+            # cv_result = regressor.cv_results.nlargest(10, 'acc')['params'].to_list()
+            flag = True
 
-        # cv_result = regressor.cv_results.nlargest(10, 'acc')['params'].to_list()
-        flag = True
+            cvs_temp = copy.deepcopy(cvs)
 
-        cvs_temp = copy.deepcopy(cvs)
-
-        remove_features = []
-        keep_features = [0]
-        for f in features[1:]:
-
-            ncpus = joblib.load(os.path.join(self.path_group, 'total_cpus.pickle'))
-            gpu_status = joblib.load(os.path.join(self.path_group, 'gpu_status.pickle'))
-
-            njobs = int(ncpus - gpu_status)
-            cpu_status = njobs
-            joblib.dump(cpu_status, os.path.join(self.path_group, 'cpu_status.pickle'))
-
-            features_temp = keep_features + [f]
-            regressor = ElasticNetCV(cv=5, random_state=42, max_iter=500000)
-            regressor.fit(X_train[:, features_temp], y_train.ravel())
-            pred = regressor.predict(X_test[:, features_temp]).reshape(-1, 1)
-            acc_test_new = np.mean(np.abs(scale_y.inverse_transform(pred).ravel() - y_test.ravel()) / rated)
-
-            # cv_result = reg_temp.cv_results.nlargest(5, 'acc')['params'].to_list()
-            if (acc_test_new - acc_test) < 0:
-                # logger.info('Remove feature %s accuracy: %s', str(f), str(reg_temp.acc_test))
-                print('ADD feature ', str(f), ' accuracy:', str(acc_test_new))
-                # logger.info('ADD feature %s accuracy: %s', str(f), str(reg_temp.acc_test))
-                keep_features.append(f)
-                acc_test = acc_test_new
-            else:
-                remove_features.append(f)
-        flag = True
-        while flag == True and len(remove_features) > 0:
-            flag = False
-            rm_feats = copy.deepcopy(remove_features)
-            for f in rm_feats:
+            remove_features = []
+            keep_features = [0]
+            for f in features[1:]:
 
                 ncpus = joblib.load(os.path.join(self.path_group, 'total_cpus.pickle'))
                 gpu_status = joblib.load(os.path.join(self.path_group, 'gpu_status.pickle'))
@@ -155,8 +126,38 @@ class FS(object):
                     # logger.info('ADD feature %s accuracy: %s', str(f), str(reg_temp.acc_test))
                     keep_features.append(f)
                     acc_test = acc_test_new
-                    remove_features.remove(f)
-                    flag = True
+                else:
+                    remove_features.append(f)
+            flag = True
+            while flag == True and len(remove_features) > 0:
+                flag = False
+                rm_feats = copy.deepcopy(remove_features)
+                for f in rm_feats:
+
+                    ncpus = joblib.load(os.path.join(self.path_group, 'total_cpus.pickle'))
+                    gpu_status = joblib.load(os.path.join(self.path_group, 'gpu_status.pickle'))
+
+                    njobs = int(ncpus - gpu_status)
+                    cpu_status = njobs
+                    joblib.dump(cpu_status, os.path.join(self.path_group, 'cpu_status.pickle'))
+
+                    features_temp = keep_features + [f]
+                    regressor = ElasticNetCV(cv=5, random_state=42, max_iter=500000)
+                    regressor.fit(X_train[:, features_temp], y_train.ravel())
+                    pred = regressor.predict(X_test[:, features_temp]).reshape(-1, 1)
+                    acc_test_new = np.mean(np.abs(scale_y.inverse_transform(pred).ravel() - y_test.ravel()) / rated)
+
+                    # cv_result = reg_temp.cv_results.nlargest(5, 'acc')['params'].to_list()
+                    if (acc_test_new - acc_test) < 0:
+                        # logger.info('Remove feature %s accuracy: %s', str(f), str(reg_temp.acc_test))
+                        print('ADD feature ', str(f), ' accuracy:', str(acc_test_new))
+                        # logger.info('ADD feature %s accuracy: %s', str(f), str(reg_temp.acc_test))
+                        keep_features.append(f)
+                        acc_test = acc_test_new
+                        remove_features.remove(f)
+                        flag = True
+        else:
+            keep_features =features[:3]
         features = np.array(keep_features)
         self.features = features
 
@@ -164,8 +165,14 @@ class FS(object):
             pca = self.reduce_dim(cvs_temp)
         else:
             pca = None
+        if self.features.shape[0] <= 1:
+            corr = []
+            for feature_temp in remove_features:
+                corr.append(np.corrcoef(X_train[:, feature_temp], y_train.ravel())[0,1])
+            self.features = np.argsort(corr)[::-1][:2]
         # logger.info('Number of variables %s', str(self.features.shape[0]))
         # logger.info('Finish the feature extraction ')
+        self.features = features
         return features, pca
 #
 # def test_fs_permute(cvs, X_test1,  y_test1, cluster_dir):

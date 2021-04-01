@@ -1,6 +1,6 @@
 import os
 
-import Fuzzy_clustering.version2.template.config as cg
+import Fuzzy_clustering.version2.template.config_timos as cg
 
 
 def write_database():
@@ -35,7 +35,7 @@ def write_database():
                    'ngpus': cg.ngpus,
                    'njobs_feat_sel': cg.njobs_feat_sel,
                    'inner_jobs_feat_sel': cg.inner_jobs_feat_sel,
-            	   'intra_op': cg.intra_op,
+                   'intra_op': cg.intra_op,
                    'train_online': cg.clustering_train_online,
                    'sklearn': {'njobs': cg.njobs_sklearn,
                                'fs_status': cg.fs_status,
@@ -77,7 +77,7 @@ def write_database():
                        'max_iterations': cg.cnn_max_iterations,
                        'learning_rate': cg.cnn_learning_rate,
                        'njobs_3d': cg.njobs_cnn_3d,
-                	   'njobs': cg.njobs_cnn,
+                       'njobs': cg.njobs_cnn,
                    },
                    'LSTM': {
                        'filters': cg.filters,
